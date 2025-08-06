@@ -1,0 +1,177 @@
+# =============================================================================
+# QueryGenie .gitignore
+# =============================================================================
+
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+.yarn/install-state.gz
+
+# Production builds
+.next/
+out/
+build/
+dist/
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+test.db
+data/*.db
+data/*.sqlite
+data/*.sqlite3
+# Keep the demo.sqlite for the demo
+!data/demo.sqlite
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage/
+*.lcov
+
+# Compiled binary addons
+build/Release
+
+# Dependency directories
+jspm_packages/
+
+# Optional npm cache directory
+.npm
+
+# Optional REPL history
+.node_repl_history
+
+# Output of 'npm pack'
+*.tgz
+
+# Yarn Integrity file
+.yarn-integrity
+
+# parcel-bundler cache
+.cache
+.parcel-cache
+
+# Next.js build output
+.next/
+out/
+
+# Nuxt.js build / generate output
+.nuxt
+dist
+
+# Storybook build outputs
+.out
+.storybook-out
+
+# Temporary folders
+tmp/
+temp/
+
+# Stores VSCode versions used for testing VSCode extensions
+.vscode-test
+
+# yarn v2
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
+.pnp.*
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+.tscache
+
+# TailwindCSS
+tailwind.config.js.backup
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Drizzle
+drizzle/
+.drizzle/
+# Keep migration files for version control
+!drizzle/*.sql
+!drizzle/meta/
+
+# SSL certificates
+*.pem
+*.crt
+*.key
+*.p12
+
+# Local development
+.vscode/
+.history/
+
+# Testing
+.nyc_output
+coverage/
+
+# Miscellaneous
+*.tgz
+*.tar.gz
+.cache/
+
+# Sentry Config File
+.sentryclirc
+
+# API Keys and sensitive files
+# (Note: These should be in .env files which are already ignored)
+api-keys.json
+secrets.json
+
+# Backup files
+*.backup
+*.bak
+*.orig
+
+# Temporary scripts
+temp-*.js
+temp-*.ts
+test-*.js
+test-*.ts
+
+# Docker
+.dockerignore
+Dockerfile.dev
+
+# Vercel
+.vercel
+
+# Turbo
+.turbo

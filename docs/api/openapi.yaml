@@ -1,0 +1,1871 @@
+openapi: 3.1.0
+info:
+  title: QueryGenie API
+  description: |
+    Enterprise-grade API for QueryGenie - AI-powered database assistant with multi-role collaboration.
+    
+    ## Authentication
+    All API endpoints require authentication via JWT tokens obtained through NextAuth.js.
+    
+    ## Rate Limiting
+    - **Free Tier**: 100 requests per 15 minutes
+    - **Pro Tier**: 1000 requests per 15 minutes  
+    - **Enterprise**: Custom limits
+    
+    ## Error Handling
+    All errors follow RFC 7807 Problem Details format.
+    
+  version: 1.0.0
+  contact:
+    name: QueryGenie API Support
+    url: https://querygenie.com/support
+    email: support@querygenie.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:3000/api
+    description: Local development server
+  - url: https://api.querygenie.com
+    description: Production server
+  - url: https://staging-api.querygenie.com
+    description: Staging server
+
+security:
+  - BearerAuth: []
+  - SessionAuth: []
+
+# =============================================================================
+# Paths
+# =============================================================================
+
+paths:
+  # Authentication Endpoints
+  /auth/session:
+    get:
+      tags: [Authentication]
+      summary: Get current user session
+      description: Returns the current authenticated user's session information
+      responses:
+        '200':
+          description: Current session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  # User Management
+  /users/me:
+    get:
+      tags: [Users]
+      summary: Get current user profile
+      description: Returns the authenticated user's profile information
+      responses:
+        '200':
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+    
+    patch:
+      tags: [Users]
+      summary: Update user profile
+      description: Updates the authenticated user's profile information
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateUserRequest'
+      responses:
+        '200':
+          description: Updated user profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /users/me/api-keys:
+    get:
+      tags: [Users]
+      summary: List user API keys
+      description: Returns all API keys for the authenticated user
+      responses:
+        '200':
+          description: List of API keys
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/UserApiKey'
+                  total:
+                    type: integer
+                    example: 3
+    
+    post:
+      tags: [Users]
+      summary: Create user API key
+      description: Creates a new API key for external AI services
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUserApiKeyRequest'
+      responses:
+        '201':
+          description: Created API key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserApiKey'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /users/me/api-keys/{keyId}:
+    delete:
+      tags: [Users]
+      summary: Delete user API key
+      description: Permanently deletes a user API key
+      parameters:
+        - name: keyId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: API key deleted successfully
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  # Workspace Management
+  /workspaces:
+    get:
+      tags: [Workspaces]
+      summary: List user workspaces
+      description: Returns all workspaces the user has access to
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: List of workspaces
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Workspace'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+    
+    post:
+      tags: [Workspaces]
+      summary: Create workspace
+      description: Creates a new workspace (user becomes owner)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateWorkspaceRequest'
+      responses:
+        '201':
+          description: Created workspace
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Workspace'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /workspaces/{workspaceId}:
+    get:
+      tags: [Workspaces]
+      summary: Get workspace details
+      description: Returns detailed information about a workspace
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+      responses:
+        '200':
+          description: Workspace details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceDetails'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+    
+    patch:
+      tags: [Workspaces]
+      summary: Update workspace
+      description: Updates workspace information (requires owner/admin role)
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateWorkspaceRequest'
+      responses:
+        '200':
+          description: Updated workspace
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Workspace'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+    
+    delete:
+      tags: [Workspaces]
+      summary: Delete workspace
+      description: Permanently deletes a workspace (requires owner role)
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+      responses:
+        '204':
+          description: Workspace deleted successfully
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /workspaces/{workspaceId}/members:
+    get:
+      tags: [Workspaces]
+      summary: List workspace members
+      description: Returns all members of a workspace
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+      responses:
+        '200':
+          description: List of workspace members
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/WorkspaceMember'
+                  total:
+                    type: integer
+    
+    post:
+      tags: [Workspaces]
+      summary: Invite user to workspace
+      description: Sends an invitation to join the workspace (requires admin+ role)
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InviteUserRequest'
+      responses:
+        '201':
+          description: Invitation sent
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invitation'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+
+  /workspaces/{workspaceId}/members/{userId}:
+    patch:
+      tags: [Workspaces]
+      summary: Update member role
+      description: Updates a member's role in the workspace (requires owner/admin role)
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [role]
+              properties:
+                role:
+                  $ref: '#/components/schemas/WorkspaceRole'
+      responses:
+        '200':
+          description: Updated member
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceMember'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+    
+    delete:
+      tags: [Workspaces]
+      summary: Remove member from workspace
+      description: Removes a member from the workspace (requires owner/admin role)
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Member removed successfully
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  # Database Connections
+  /workspaces/{workspaceId}/connections:
+    get:
+      tags: [Connections]
+      summary: List database connections
+      description: Returns all database connections in a workspace
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+      responses:
+        '200':
+          description: List of database connections
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Connection'
+                  total:
+                    type: integer
+    
+    post:
+      tags: [Connections]
+      summary: Create database connection
+      description: Creates a new database connection (requires admin+ role)
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateConnectionRequest'
+      responses:
+        '201':
+          description: Created database connection
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Connection'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+
+  /workspaces/{workspaceId}/connections/{connectionId}:
+    get:
+      tags: [Connections]
+      summary: Get connection details
+      description: Returns detailed information about a database connection
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/ConnectionId'
+      responses:
+        '200':
+          description: Connection details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConnectionDetails'
+    
+    patch:
+      tags: [Connections]
+      summary: Update database connection
+      description: Updates a database connection (requires admin+ role)
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/ConnectionId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateConnectionRequest'
+      responses:
+        '200':
+          description: Updated connection
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Connection'
+    
+    delete:
+      tags: [Connections]
+      summary: Delete database connection
+      description: Permanently deletes a database connection (requires admin+ role)
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/ConnectionId'
+      responses:
+        '204':
+          description: Connection deleted successfully
+
+  /workspaces/{workspaceId}/connections/{connectionId}/test:
+    post:
+      tags: [Connections]
+      summary: Test database connection
+      description: Tests connectivity to a database
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/ConnectionId'
+      responses:
+        '200':
+          description: Connection test result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConnectionTestResult'
+
+  /workspaces/{workspaceId}/connections/{connectionId}/schema:
+    post:
+      tags: [Connections]
+      summary: Ingest database schema
+      description: Imports and processes the database schema
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/ConnectionId'
+      responses:
+        '202':
+          description: Schema ingestion started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobResponse'
+    
+    get:
+      tags: [Connections]
+      summary: Get database schema
+      description: Returns the current database schema information
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/ConnectionId'
+      responses:
+        '200':
+          description: Database schema
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DatabaseSchema'
+
+  # Query Management
+  /workspaces/{workspaceId}/queries:
+    get:
+      tags: [Queries]
+      summary: List queries
+      description: Returns queries in a workspace (history and saved)
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [all, saved, history]
+            default: all
+        - name: connectionId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: List of queries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Query'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+    
+    post:
+      tags: [Queries]
+      summary: Execute or save query
+      description: Executes a SQL query or saves it for later use
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExecuteQueryRequest'
+      responses:
+        '200':
+          description: Query execution result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueryResult'
+        '202':
+          description: Query execution started (for long-running queries)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobResponse'
+
+  /workspaces/{workspaceId}/queries/generate:
+    post:
+      tags: [Queries]
+      summary: Generate SQL from natural language
+      description: Uses AI to generate SQL query from natural language prompt
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenerateQueryRequest'
+      responses:
+        '200':
+          description: Generated SQL query
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GeneratedQuery'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+
+  /workspaces/{workspaceId}/queries/{queryId}:
+    get:
+      tags: [Queries]
+      summary: Get query details
+      description: Returns detailed information about a query
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - name: queryId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Query details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueryDetails'
+    
+    patch:
+      tags: [Queries]
+      summary: Update query
+      description: Updates query metadata (title, description, tags)
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - name: queryId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateQueryRequest'
+      responses:
+        '200':
+          description: Updated query
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Query'
+    
+    delete:
+      tags: [Queries]
+      summary: Delete query
+      description: Permanently deletes a query
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - name: queryId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Query deleted successfully
+
+  /workspaces/{workspaceId}/queries/{queryId}/explain:
+    post:
+      tags: [Queries]
+      summary: Explain query
+      description: Uses AI to explain what a SQL query does in plain English
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - name: queryId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Query explanation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueryExplanation'
+
+  /workspaces/{workspaceId}/queries/{queryId}/optimize:
+    post:
+      tags: [Queries]
+      summary: Optimize query
+      description: Uses AI to suggest query optimizations
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - name: queryId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Query optimization suggestions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueryOptimization'
+
+  # Documentation
+  /workspaces/{workspaceId}/docs:
+    get:
+      tags: [Documentation]
+      summary: List documentation
+      description: Returns all documentation in a workspace
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - name: scope
+          in: query
+          schema:
+            type: string
+            enum: [workspace, connection, schema, table, column]
+        - name: scopeId
+          in: query
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: List of documentation
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Documentation'
+                  total:
+                    type: integer
+    
+    post:
+      tags: [Documentation]
+      summary: Generate documentation
+      description: Uses AI to generate documentation for database objects
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenerateDocRequest'
+      responses:
+        '201':
+          description: Generated documentation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Documentation'
+
+  # Health Check
+  /health:
+    get:
+      tags: [System]
+      summary: Health check
+      description: Returns system health status
+      security: []
+      responses:
+        '200':
+          description: System is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+        '503':
+          description: System is unhealthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+# =============================================================================
+# Components
+# =============================================================================
+
+components:
+  # Security Schemes
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    
+    SessionAuth:
+      type: apiKey
+      in: cookie
+      name: next-auth.session-token
+
+  # Common Parameters
+  parameters:
+    WorkspaceId:
+      name: workspaceId
+      in: path
+      required: true
+      description: Workspace ID
+      schema:
+        type: string
+        format: uuid
+      example: 123e4567-e89b-12d3-a456-426614174000
+    
+    ConnectionId:
+      name: connectionId
+      in: path
+      required: true
+      description: Database connection ID
+      schema:
+        type: string
+        format: uuid
+      example: 123e4567-e89b-12d3-a456-426614174001
+
+  # Schemas
+  schemas:
+    # Common Types
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+          example: 1
+        limit:
+          type: integer
+          example: 20
+        total:
+          type: integer
+          example: 150
+        pages:
+          type: integer
+          example: 8
+
+    JobResponse:
+      type: object
+      properties:
+        jobId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [pending, running, completed, failed]
+        estimatedDuration:
+          type: integer
+          description: Estimated duration in seconds
+
+    # User Types
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+          nullable: true
+        avatar:
+          type: string
+          format: uri
+          nullable: true
+        role:
+          type: string
+          enum: [admin, developer, analyst]
+        emailVerified:
+          type: string
+          format: date-time
+          nullable: true
+        isActive:
+          type: boolean
+        lastLoginAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    UpdateUserRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 255
+        avatar:
+          type: string
+          format: uri
+
+    SessionResponse:
+      type: object
+      properties:
+        user:
+          $ref: '#/components/schemas/User'
+        expires:
+          type: string
+          format: date-time
+        workspaces:
+          type: array
+          items:
+            $ref: '#/components/schemas/Workspace'
+
+    UserApiKey:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        provider:
+          type: string
+          enum: [openai, anthropic, gemini_pro]
+        name:
+          type: string
+          nullable: true
+        isActive:
+          type: boolean
+        lastUsedAt:
+          type: string
+          format: date-time
+          nullable: true
+        usageCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+
+    CreateUserApiKeyRequest:
+      type: object
+      required:
+        - provider
+        - apiKey
+      properties:
+        provider:
+          type: string
+          enum: [openai, anthropic, gemini_pro]
+        name:
+          type: string
+          maxLength: 255
+        apiKey:
+          type: string
+          description: The API key (will be encrypted)
+
+    # Workspace Types
+    WorkspaceRole:
+      type: string
+      enum: [owner, admin, editor, viewer]
+      description: |
+        - **owner**: Full access including deletion
+        - **admin**: Manage connections, members, settings
+        - **editor**: Create/execute queries, edit docs  
+        - **viewer**: Read-only access
+
+    Workspace:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        slug:
+          type: string
+        description:
+          type: string
+          nullable: true
+        avatar:
+          type: string
+          format: uri
+          nullable: true
+        ownerId:
+          type: string
+          format: uuid
+        isActive:
+          type: boolean
+        memberCount:
+          type: integer
+        connectionCount:
+          type: integer
+        role:
+          $ref: '#/components/schemas/WorkspaceRole'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    WorkspaceDetails:
+      allOf:
+        - $ref: '#/components/schemas/Workspace'
+        - type: object
+          properties:
+            owner:
+              $ref: '#/components/schemas/User'
+            settings:
+              type: object
+              additionalProperties: true
+            members:
+              type: array
+              items:
+                $ref: '#/components/schemas/WorkspaceMember'
+            recentActivity:
+              type: array
+              items:
+                $ref: '#/components/schemas/AuditLog'
+
+    CreateWorkspaceRequest:
+      type: object
+      required:
+        - name
+        - slug
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        slug:
+          type: string
+          pattern: '^[a-z0-9-]+$'
+          minLength: 3
+          maxLength: 100
+        description:
+          type: string
+          maxLength: 1000
+
+    UpdateWorkspaceRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        description:
+          type: string
+          maxLength: 1000
+        avatar:
+          type: string
+          format: uri
+        settings:
+          type: object
+          additionalProperties: true
+
+    WorkspaceMember:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        user:
+          $ref: '#/components/schemas/User'
+        role:
+          $ref: '#/components/schemas/WorkspaceRole'
+        isActive:
+          type: boolean
+        joinedAt:
+          type: string
+          format: date-time
+
+    InviteUserRequest:
+      type: object
+      required:
+        - email
+        - role
+      properties:
+        email:
+          type: string
+          format: email
+        role:
+          $ref: '#/components/schemas/WorkspaceRole'
+
+    Invitation:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        role:
+          $ref: '#/components/schemas/WorkspaceRole'
+        status:
+          type: string
+          enum: [pending, accepted, declined, expired]
+        invitedBy:
+          $ref: '#/components/schemas/User'
+        expiresAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+
+    # Connection Types
+    ConnectionType:
+      type: string
+      enum: [postgres, mysql, mssql, sqlite]
+
+    ConnectionMode:
+      type: string
+      enum: [read-only, read-write]
+
+    Connection:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        type:
+          $ref: '#/components/schemas/ConnectionType'
+        mode:
+          $ref: '#/components/schemas/ConnectionMode'
+        host:
+          type: string
+          nullable: true
+        port:
+          type: integer
+          nullable: true
+        database:
+          type: string
+          nullable: true
+        isActive:
+          type: boolean
+        lastConnectedAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdBy:
+          $ref: '#/components/schemas/User'
+        createdAt:
+          type: string
+          format: date-time
+
+    ConnectionDetails:
+      allOf:
+        - $ref: '#/components/schemas/Connection'
+        - type: object
+          properties:
+            schemas:
+              type: array
+              items:
+                $ref: '#/components/schemas/DatabaseSchema'
+            recentQueries:
+              type: array
+              items:
+                $ref: '#/components/schemas/Query'
+
+    CreateConnectionRequest:
+      type: object
+      required:
+        - name
+        - type
+        - credentials
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        type:
+          $ref: '#/components/schemas/ConnectionType'
+        mode:
+          $ref: '#/components/schemas/ConnectionMode'
+        host:
+          type: string
+        port:
+          type: integer
+          minimum: 1
+          maximum: 65535
+        database:
+          type: string
+        username:
+          type: string
+        password:
+          type: string
+          description: Will be encrypted
+        sslConfig:
+          type: object
+          additionalProperties: true
+
+    UpdateConnectionRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        mode:
+          $ref: '#/components/schemas/ConnectionMode'
+        host:
+          type: string
+        port:
+          type: integer
+        database:
+          type: string
+        username:
+          type: string
+        password:
+          type: string
+        sslConfig:
+          type: object
+          additionalProperties: true
+
+    ConnectionTestResult:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        latency:
+          type: integer
+          description: Connection latency in milliseconds
+        serverInfo:
+          type: object
+          additionalProperties: true
+
+    # Schema Types
+    DatabaseSchema:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        version:
+          type: string
+        tableCount:
+          type: integer
+        isActive:
+          type: boolean
+        tables:
+          type: array
+          items:
+            $ref: '#/components/schemas/DatabaseTable'
+        ingestedAt:
+          type: string
+          format: date-time
+
+    DatabaseTable:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        schemaName:
+          type: string
+          nullable: true
+        type:
+          type: string
+          enum: [table, view, materialized_view]
+        description:
+          type: string
+          nullable: true
+        columnCount:
+          type: integer
+        estimatedRowCount:
+          type: integer
+          nullable: true
+        columns:
+          type: array
+          items:
+            $ref: '#/components/schemas/DatabaseColumn'
+
+    DatabaseColumn:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        dataType:
+          type: string
+        isNullable:
+          type: boolean
+        isPrimaryKey:
+          type: boolean
+        isForeignKey:
+          type: boolean
+        isUnique:
+          type: boolean
+        hasIndex:
+          type: boolean
+        defaultValue:
+          type: string
+          nullable: true
+        maxLength:
+          type: integer
+          nullable: true
+        position:
+          type: integer
+        description:
+          type: string
+          nullable: true
+
+    # Query Types
+    QueryStatus:
+      type: string
+      enum: [pending, running, completed, failed, cancelled]
+
+    Query:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        prompt:
+          type: string
+          nullable: true
+          description: Original natural language prompt
+        sqlQuery:
+          type: string
+        status:
+          $ref: '#/components/schemas/QueryStatus'
+        executionTime:
+          type: integer
+          nullable: true
+          description: Execution time in milliseconds
+        rowsAffected:
+          type: integer
+          nullable: true
+        errorMessage:
+          type: string
+          nullable: true
+        isShared:
+          type: boolean
+        isSaved:
+          type: boolean
+        tags:
+          type: string
+          nullable: true
+          description: Comma-separated tags
+        connection:
+          $ref: '#/components/schemas/Connection'
+        createdBy:
+          $ref: '#/components/schemas/User'
+        createdAt:
+          type: string
+          format: date-time
+
+    QueryDetails:
+      allOf:
+        - $ref: '#/components/schemas/Query'
+        - type: object
+          properties:
+            executions:
+              type: array
+              items:
+                $ref: '#/components/schemas/QueryExecution'
+            metadata:
+              type: object
+              additionalProperties: true
+
+    ExecuteQueryRequest:
+      type: object
+      required:
+        - sqlQuery
+        - connectionId
+      properties:
+        sqlQuery:
+          type: string
+          minLength: 1
+        connectionId:
+          type: string
+          format: uuid
+        title:
+          type: string
+        description:
+          type: string
+        isSaved:
+          type: boolean
+          default: false
+        tags:
+          type: string
+          description: Comma-separated tags
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 10000
+          default: 100
+          description: Row limit for SELECT queries
+
+    QueryResult:
+      type: object
+      properties:
+        query:
+          $ref: '#/components/schemas/Query'
+        data:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        columns:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              type:
+                type: string
+        rowCount:
+          type: integer
+        executionTime:
+          type: integer
+        hasMore:
+          type: boolean
+          description: True if there are more rows available
+
+    GenerateQueryRequest:
+      type: object
+      required:
+        - prompt
+        - connectionId
+      properties:
+        prompt:
+          type: string
+          minLength: 1
+          maxLength: 1000
+          description: Natural language description of desired query
+        connectionId:
+          type: string
+          format: uuid
+        model:
+          type: string
+          enum: [gemini, claude, gpt4]
+          description: AI model to use (optional)
+        includeExamples:
+          type: boolean
+          default: true
+          description: Whether to include example data in response
+
+    GeneratedQuery:
+      type: object
+      properties:
+        sqlQuery:
+          type: string
+        explanation:
+          type: string
+        confidence:
+          type: number
+          minimum: 0
+          maximum: 1
+        model:
+          type: string
+        warnings:
+          type: array
+          items:
+            type: string
+        suggestions:
+          type: array
+          items:
+            type: string
+
+    QueryExecution:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        executedBy:
+          $ref: '#/components/schemas/User'
+        startedAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: string
+          format: date-time
+          nullable: true
+        duration:
+          type: integer
+          description: Duration in milliseconds
+        rowCount:
+          type: integer
+          nullable: true
+        status:
+          $ref: '#/components/schemas/QueryStatus'
+        errorMessage:
+          type: string
+          nullable: true
+
+    UpdateQueryRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        isSaved:
+          type: boolean
+        isShared:
+          type: boolean
+        tags:
+          type: string
+
+    QueryExplanation:
+      type: object
+      properties:
+        explanation:
+          type: string
+          description: Plain English explanation of the query
+        complexity:
+          type: string
+          enum: [simple, moderate, complex]
+        breakdown:
+          type: array
+          items:
+            type: object
+            properties:
+              section:
+                type: string
+              description:
+                type: string
+        model:
+          type: string
+
+    QueryOptimization:
+      type: object
+      properties:
+        optimizedQuery:
+          type: string
+          nullable: true
+        suggestions:
+          type: array
+          items:
+            type: object
+            properties:
+              type:
+                type: string
+                enum: [index, rewrite, schema]
+              description:
+                type: string
+              impact:
+                type: string
+                enum: [low, medium, high]
+              estimatedImprovement:
+                type: string
+                nullable: true
+        model:
+          type: string
+
+    # Documentation Types
+    DocumentationScope:
+      type: string
+      enum: [workspace, connection, schema, table, column]
+
+    Documentation:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        scope:
+          $ref: '#/components/schemas/DocumentationScope'
+        scopeId:
+          type: string
+          format: uuid
+          nullable: true
+        title:
+          type: string
+        content:
+          type: string
+          description: Markdown content
+        template:
+          type: string
+          nullable: true
+        isPublic:
+          type: boolean
+        version:
+          type: integer
+        generatedBy:
+          $ref: '#/components/schemas/User'
+        lastEditedBy:
+          $ref: '#/components/schemas/User'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    GenerateDocRequest:
+      type: object
+      required:
+        - scope
+        - title
+      properties:
+        scope:
+          $ref: '#/components/schemas/DocumentationScope'
+        scopeId:
+          type: string
+          format: uuid
+          description: Required for scopes other than workspace
+        title:
+          type: string
+          minLength: 1
+          maxLength: 255
+        template:
+          type: string
+          enum: [technical, business, api]
+          default: technical
+        includeExamples:
+          type: boolean
+          default: true
+
+    # Audit Types
+    AuditLog:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        action:
+          type: string
+          enum: [create, read, update, delete, login, logout, invite, remove, execute_query, generate_docs, export_data]
+        resource:
+          type: string
+        resourceId:
+          type: string
+          format: uuid
+          nullable: true
+        user:
+          $ref: '#/components/schemas/User'
+        ipAddress:
+          type: string
+          nullable: true
+        userAgent:
+          type: string
+          nullable: true
+        metadata:
+          type: object
+          additionalProperties: true
+        createdAt:
+          type: string
+          format: date-time
+
+    # System Types
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [healthy, unhealthy]
+        timestamp:
+          type: string
+          format: date-time
+        version:
+          type: string
+        services:
+          type: object
+          properties:
+            database:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum: [healthy, unhealthy]
+                latency:
+                  type: integer
+                  description: Connection latency in milliseconds
+            redis:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum: [healthy, unhealthy]
+                latency:
+                  type: integer
+            ai:
+              type: object
+              properties:
+                providers:
+                  type: object
+                  properties:
+                    gemini:
+                      type: string
+                      enum: [available, unavailable]
+                    openai:
+                      type: string
+                      enum: [available, unavailable]
+                    anthropic:
+                      type: string
+                      enum: [available, unavailable]
+
+    # Error Types
+    ErrorResponse:
+      type: object
+      properties:
+        type:
+          type: string
+          format: uri
+          description: A URI reference that identifies the problem type
+        title:
+          type: string
+          description: A short, human-readable summary of the problem type
+        status:
+          type: integer
+          description: The HTTP status code
+        detail:
+          type: string
+          description: A human-readable explanation specific to this occurrence
+        instance:
+          type: string
+          format: uri
+          description: A URI reference that identifies the specific occurrence
+        timestamp:
+          type: string
+          format: date-time
+        traceId:
+          type: string
+          description: Request trace ID for debugging
+
+    ValidationErrorResponse:
+      allOf:
+        - $ref: '#/components/schemas/ErrorResponse'
+        - type: object
+          properties:
+            errors:
+              type: array
+              items:
+                type: object
+                properties:
+                  field:
+                    type: string
+                  code:
+                    type: string
+                  message:
+                    type: string
+                  value:
+                    description: The invalid value
+
+  # Common Responses
+  responses:
+    UnauthorizedError:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            type: https://querygenie.com/errors/unauthorized
+            title: Unauthorized
+            status: 401
+            detail: Valid authentication is required to access this resource
+            instance: /api/workspaces/123
+            timestamp: "2024-01-20T10:30:00Z"
+            traceId: abc123
+
+    ForbiddenError:
+      description: Insufficient permissions
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            type: https://querygenie.com/errors/forbidden
+            title: Forbidden
+            status: 403
+            detail: You do not have permission to perform this action
+            instance: /api/workspaces/123/connections
+            timestamp: "2024-01-20T10:30:00Z"
+            traceId: abc123
+
+    NotFoundError:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            type: https://querygenie.com/errors/not-found
+            title: Not Found
+            status: 404
+            detail: The requested resource was not found
+            instance: /api/workspaces/invalid-id
+            timestamp: "2024-01-20T10:30:00Z"
+            traceId: abc123
+
+    ValidationError:
+      description: Validation failed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ValidationErrorResponse'
+          example:
+            type: https://querygenie.com/errors/validation
+            title: Validation Failed
+            status: 400
+            detail: One or more fields contain invalid values
+            instance: /api/workspaces
+            timestamp: "2024-01-20T10:30:00Z"
+            traceId: abc123
+            errors:
+              - field: name
+                code: required
+                message: Name is required
+              - field: slug
+                code: pattern
+                message: Slug must contain only lowercase letters, numbers, and hyphens
+                value: "Invalid Slug!"
+
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            type: https://querygenie.com/errors/internal
+            title: Internal Server Error
+            status: 500
+            detail: An unexpected error occurred while processing your request
+            instance: /api/queries/generate
+            timestamp: "2024-01-20T10:30:00Z"
+            traceId: abc123
+
+# =============================================================================
+# Tags
+# =============================================================================
+
+tags:
+  - name: Authentication
+    description: User authentication and session management
+  - name: Users
+    description: User profile and API key management
+  - name: Workspaces
+    description: Team workspace and member management
+  - name: Connections
+    description: Database connection management
+  - name: Queries
+    description: Query execution and AI-powered query generation
+  - name: Documentation
+    description: AI-generated documentation management
+  - name: System
+    description: System health and monitoring endpoints
