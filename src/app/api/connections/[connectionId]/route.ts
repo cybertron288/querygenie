@@ -9,7 +9,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth/config";
 import { db } from "@/lib/db";
 import { connections, memberships } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, isNull } from "drizzle-orm";
 import { z } from "zod";
 import {
   updateConnection,
@@ -59,7 +59,7 @@ export async function GET(
       .where(
         and(
           eq(connections.id, connectionId),
-          eq(connections.deletedAt, null)
+          isNull(connections.deletedAt)
         )
       )
       .limit(1);
@@ -163,7 +163,7 @@ export async function PATCH(
       .where(
         and(
           eq(connections.id, connectionId),
-          eq(connections.deletedAt, null)
+          isNull(connections.deletedAt)
         )
       )
       .limit(1);
@@ -246,7 +246,7 @@ export async function DELETE(
       .where(
         and(
           eq(connections.id, connectionId),
-          eq(connections.deletedAt, null)
+          isNull(connections.deletedAt)
         )
       )
       .limit(1);
@@ -321,7 +321,7 @@ export async function POST(
       .where(
         and(
           eq(connections.id, connectionId),
-          eq(connections.deletedAt, null)
+          isNull(connections.deletedAt)
         )
       )
       .limit(1);

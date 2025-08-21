@@ -8,9 +8,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth/config";
 import { generateSQLQuery } from "@/lib/ai/query-generator";
+import { generateEnhancedSQLQuery } from "@/lib/ai/enhanced-query-generator";
+import { getSchemaInfo } from "@/lib/db/schema-introspection";
+import { getConnectionConfig } from "@/lib/db/connection-service";
 import { db } from "@/lib/db";
 import { connections, workspaces, memberships, conversations, aiMessages } from "@/lib/db/schema";
-import { eq, and, isNull, sql } from "drizzle-orm";
+import { eq, and, isNull, sql, asc } from "drizzle-orm";
 import { z } from "zod";
 
 // Request validation schema
@@ -44,7 +47,9 @@ export async function POST(request: NextRequest) {
 
     // Get connection details if provided
     let connectionType = "postgres"; // Default
-    let schema = {};
+    let connectionConfig = null;
+    let schemaInfo = null;
+    let conversationHistory = [];
 
     if (validatedData.connectionId) {
       // Fetch connection details
@@ -94,22 +99,42 @@ export async function POST(request: NextRequest) {
 
       connectionType = connection[0].type;
 
-      // Get schema information if requested
-      if (validatedData.includeSchema) {
-        // In a production app, you would fetch the actual schema from the database
-        // For now, we'll use a mock schema
-        schema = await getConnectionSchema(validatedData.connectionId);
+      // Get connection config for schema introspection
+      try {
+        connectionConfig = await getConnectionConfig(validatedData.connectionId);
+        
+        // Get actual schema information from the database
+        schemaInfo = await getSchemaInfo(connectionType, connectionConfig);
+      } catch (error) {
+        console.error("Failed to get schema info:", error);
+        // Continue without schema info
       }
     }
 
-    // Generate SQL query using AI
-    const result = await generateSQLQuery({
+    // Get conversation history if conversationId is provided
+    if (validatedData.conversationId) {
+      const messages = await db
+        .select({
+          role: aiMessages.role,
+          content: aiMessages.content,
+        })
+        .from(aiMessages)
+        .where(eq(aiMessages.conversationId, validatedData.conversationId))
+        .orderBy(asc(aiMessages.createdAt))
+        .limit(10); // Last 10 messages for context
+
+      conversationHistory = messages;
+    }
+
+    // Use enhanced SQL generation with schema awareness
+    const result = await generateEnhancedSQLQuery({
       prompt: validatedData.prompt,
       connectionType,
+      connectionConfig,
+      schemaInfo,
+      conversationHistory,
       model: validatedData.model as any,
-      includeExamples: true,
-      temperature: 0.2,
-      schema,
+      temperature: 0.3,
     });
 
     // If conversation ID is provided, save messages to conversation
@@ -122,17 +147,33 @@ export async function POST(request: NextRequest) {
           content: validatedData.prompt,
         });
 
-        // Add AI response
+        // Add AI response based on response type
+        const responseContent = result.message || result.explanation || 
+          (result.type === "query" ? "Here's the SQL query for your request:" : "");
+        
+        // For exploration queries, save the explorationQuery to sqlQuery field
+        const sqlQuery = result.type === "exploration" 
+          ? result.explorationQuery 
+          : result.query;
+        
         await db.insert(aiMessages).values({
           conversationId: validatedData.conversationId,
           role: "assistant",
-          content: result.explanation || "Here's the SQL query for your request:",
-          sqlQuery: result.query,
-          explanation: result.explanation,
-          confidence: result.confidence,
+          content: responseContent,
+          sqlQuery: sqlQuery || null,
+          explanation: result.explanation || null,
+          confidence: result.confidence || null,
           metadata: {
             model: validatedData.model,
             connectionType,
+            responseType: result.type,
+            isExploration: result.type === "exploration",
+            requiresConfirmation: result.requiresConfirmation || false,
+            suggestions: result.suggestions?.map(t => ({
+              schema: t.schema,
+              tableName: t.tableName,
+              columns: t.columns.length,
+            })),
             timestamp: new Date().toISOString(),
           },
         });
@@ -156,9 +197,14 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      sql: result.query,
-      explanation: result.explanation,
-      confidence: result.confidence,
+      type: result.type,
+      sql: result.query || null,
+      explorationQuery: result.explorationQuery || null,
+      explanation: result.explanation || null,
+      message: result.message || null,
+      confidence: result.confidence || null,
+      suggestions: result.suggestions || null,
+      requiresConfirmation: result.requiresConfirmation || false,
       model: validatedData.model,
       connectionType,
       conversationId: validatedData.conversationId,

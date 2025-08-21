@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Database,
   Plus,
@@ -446,6 +447,11 @@ export default function ConnectionsPage() {
                             >
                               {connection.isActive ? "Active" : "Inactive"}
                             </Badge>
+                            {!connection.username && connection.type !== "sqlite" && (
+                              <Badge variant="destructive" className="text-xs">
+                                No Credentials
+                              </Badge>
+                            )}
                             {connection.lastConnectedAt && (
                               <span className="text-xs text-muted-foreground flex items-center gap-1">
                                 <Clock className="h-3 w-3" />

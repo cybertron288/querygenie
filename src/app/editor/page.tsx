@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Play,
   Save,
@@ -55,6 +56,8 @@ import {
 } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
+import { AnimatedPage } from "@/components/ui/animated-page";
+import { fadeInVariants, staggerContainer, staggerItem } from "@/lib/animations";
 
 interface Connection {
   id: string;

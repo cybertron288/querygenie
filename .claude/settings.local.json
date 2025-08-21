@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run type-check:*)",
+      "Bash(npm run local:up:*)",
+      "Bash(psql:*)",
+      "Bash(npm run:*)",
+      "Bash(npm install:*)",
+      "Bash(pnpm add:*)",
+      "Bash(rm:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

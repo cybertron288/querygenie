@@ -37,14 +37,26 @@ interface QueryResult {
  */
 export async function executeQuery(options: QueryOptions): Promise<QueryResult> {
   try {
-    // Decrypt password
-    const password = await decrypt(options.connection.password);
+    // Handle empty or missing credentials
+    let password = "";
+    if (options.connection.password) {
+      try {
+        password = await decrypt(options.connection.password);
+      } catch (error) {
+        console.error("Failed to decrypt password, using empty password");
+        password = "";
+      }
+    }
     
     // Decrypt SSL config if present
     let sslConfig = null;
     if (options.connection.sslConfig) {
-      const decryptedConfig = await decrypt(options.connection.sslConfig);
-      sslConfig = JSON.parse(decryptedConfig);
+      try {
+        const decryptedConfig = await decrypt(options.connection.sslConfig);
+        sslConfig = JSON.parse(decryptedConfig);
+      } catch (error) {
+        console.error("Failed to decrypt SSL config, skipping");
+      }
     }
 
     // Apply limit if not already in query

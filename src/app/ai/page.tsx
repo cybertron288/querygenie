@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Send,
   Copy,
@@ -48,6 +49,8 @@ import { sql } from '@codemirror/lang-sql';
 import { oneDark } from '@codemirror/theme-one-dark';
 import { useTheme } from "next-themes";
 import { cn } from "@/lib/utils";
+import { messageVariants, sidebarVariants, slideInFromLeft } from "@/lib/animations";
+import { TableSelector } from "@/components/ui/table-selector";
 
 // Utility function for relative time
 function getRelativeTime(date: Date): string {
@@ -72,6 +75,9 @@ interface Message {
   confidence?: number;
   timestamp: Date;
   error?: string;
+  isExploration?: boolean;
+  requiresConfirmation?: boolean;
+  explorationResults?: any;
 }
 
 interface Connection {
@@ -124,6 +130,12 @@ export default function AIAssistantPage() {
   const [currentConversation, setCurrentConversation] = useState<Conversation | null>(null);
   const [isLoadingConversations, setIsLoadingConversations] = useState(false);
   const [showConversationSidebar, setShowConversationSidebar] = useState(true);
+  const [skipReload, setSkipReload] = useState(false);
+  
+  // State for table selection
+  const [showTableSelector, setShowTableSelector] = useState(false);
+  const [explorationTables, setExplorationTables] = useState<any[]>([]);
+  const [userQuery, setUserQuery] = useState("");
 
   // Get workspace ID from session - using the first workspace from memberships
   // Use the Acme Corp workspace ID which has the connections
@@ -251,6 +263,12 @@ export default function AIAssistantPage() {
         return;
       }
       
+      // Skip reload if we're processing an exploration query
+      if (skipReload) {
+        setSkipReload(false);
+        return;
+      }
+      
       try {
         const response = await fetch(`/api/conversations/${currentConversation.id}`);
         
@@ -265,6 +283,9 @@ export default function AIAssistantPage() {
             confidence: msg.confidence,
             timestamp: new Date(msg.createdAt),
             error: msg.error,
+            // Restore exploration flags from metadata
+            isExploration: msg.metadata?.isExploration || false,
+            requiresConfirmation: msg.metadata?.requiresConfirmation || false,
           }));
           
           setMessages(formattedMessages);
@@ -398,19 +419,53 @@ export default function AIAssistantPage() {
       }
 
       const data = await response.json();
+      console.log("AI Response:", data);
 
-      // Create assistant message optimistically (already saved to DB by API)
-      const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: "assistant",
-        content: data.explanation || "Here's the SQL query I generated:",
-        sql: data.sql,
-        explanation: data.explanation,
-        confidence: data.confidence,
-        timestamp: new Date(),
-      };
-
-      setMessages((prev) => [...prev, assistantMessage]);
+      // Handle different response types
+      if (data.type === "exploration") {
+        // AI wants to explore the schema
+        const explorationQuery = data.explorationQuery || data.sql;
+        console.log("Exploration query:", explorationQuery);
+        
+        // Set skip flag to prevent reload from overwriting this message
+        setSkipReload(true);
+        
+        const assistantMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: data.message || "I'll help you explore the database schema.",
+          sql: explorationQuery,
+          explanation: explorationQuery ? "This query will explore the database schema. Click 'Yes, Execute' to run it and see the results." : "No exploration query generated",
+          confidence: 100,
+          timestamp: new Date(),
+          isExploration: true,
+          requiresConfirmation: !!explorationQuery,
+        };
+        setMessages((prev) => [...prev, assistantMessage]);
+        
+      } else if (data.type === "clarification") {
+        // AI needs clarification
+        const assistantMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: data.message || "I need more information to help you.",
+          timestamp: new Date(),
+        };
+        setMessages((prev) => [...prev, assistantMessage]);
+        
+      } else {
+        // Regular query or explanation
+        const assistantMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: data.message || data.explanation || "Here's the SQL query I generated:",
+          sql: data.sql,
+          explanation: data.explanation,
+          confidence: data.confidence,
+          timestamp: new Date(),
+        };
+        setMessages((prev) => [...prev, assistantMessage]);
+      }
 
       // Update conversation activity locally
       if (currentConversation) {
@@ -476,6 +531,174 @@ export default function AIAssistantPage() {
     router.push(`/editor?${params.toString()}`);
   };
 
+  const handleExecuteExploration = async (messageId: string, sql: string) => {
+    if (!currentConversation || !selectedConnection) return;
+
+    try {
+      // Update message to show loading
+      setMessages(prev => prev.map(msg => 
+        msg.id === messageId 
+          ? { ...msg, requiresConfirmation: false, content: "Executing exploration query..." }
+          : msg
+      ));
+
+      // Execute the exploration query
+      const response = await fetch("/api/ai/execute-tool", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          connectionId: selectedConnection,
+          query: sql,
+          conversationId: currentConversation.id,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to execute exploration query");
+      }
+
+      const result = await response.json();
+
+      // Update message with results
+      setMessages(prev => prev.map(msg => 
+        msg.id === messageId 
+          ? { 
+              ...msg, 
+              content: `Found ${result.rowCount} tables in the database. Please select a table to query:`,
+              explorationResults: result,
+              requiresConfirmation: false,
+            }
+          : msg
+      ));
+
+      // Store the user's original query
+      const originalUserQuery = messages.find(m => m.role === "user" && m.timestamp.getTime() > Date.now() - 60000)?.content || "";
+      setUserQuery(originalUserQuery);
+
+      // Show table selector with the results
+      if (result.rows && result.rows.length > 0) {
+        setExplorationTables(result.rows);
+        setShowTableSelector(true);
+      } else {
+        // No tables found
+        const errorMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: "No tables found in the specified schema. Please check the schema name and try again.",
+          timestamp: new Date(),
+        };
+        setMessages(prev => [...prev, errorMessage]);
+      }
+
+    } catch (error: any) {
+      // Update message with error
+      setMessages(prev => prev.map(msg => 
+        msg.id === messageId 
+          ? { 
+              ...msg, 
+              content: "Failed to execute exploration query.",
+              error: error.message,
+              requiresConfirmation: false,
+            }
+          : msg
+      ));
+    }
+  };
+
+  const deleteConversation = async (conversationId: string) => {
+    if (!confirm("Are you sure you want to delete this conversation?")) {
+      return;
+    }
+    
+    try {
+      const response = await fetch(`/api/conversations/${conversationId}`, {
+        method: 'DELETE',
+      });
+      
+      if (response.ok) {
+        // Remove from local state
+        setConversations(prev => prev.filter(c => c.id !== conversationId));
+        
+        // If it was the current conversation, clear messages
+        if (currentConversation?.id === conversationId) {
+          setCurrentConversation(null);
+          setMessages([]);
+        }
+      } else {
+        console.error("Failed to delete conversation");
+      }
+    } catch (error) {
+      console.error("Error deleting conversation:", error);
+    }
+  };
+
+  const handleTableSelect = async (table: any) => {
+    // Hide table selector
+    setShowTableSelector(false);
+    
+    // Extract table name dynamically based on what fields are present
+    const tableName = table.tablename || table.table || table.table_name || table.name;
+    const schemaName = table.schemaname || table.schema || table.table_schema;
+    const fullTableName = schemaName ? `${schemaName}.${tableName}` : tableName;
+    
+    // Create a message showing the selected table
+    const selectionMessage: Message = {
+      id: Date.now().toString(),
+      role: "system",
+      content: `Selected table: ${fullTableName}`,
+      timestamp: new Date(),
+    };
+    setMessages(prev => [...prev, selectionMessage]);
+    
+    // Generate query for the selected table based on original user query
+    setIsGenerating(true);
+    
+    try {
+      const response = await fetch("/api/ai/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt: `Generate a SQL query for table "${fullTableName}" based on this request: ${userQuery}. The table has these columns: ${table.columns}`,
+          connectionId: selectedConnection,
+          conversationId: currentConversation?.id,
+          model: selectedModel,
+          includeSchema: false, // We already know the table
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to generate query for selected table");
+      }
+
+      const data = await response.json();
+      
+      // Add the generated query as a message
+      const queryMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: "assistant",
+        content: data.message || data.explanation || `Here's the query for ${fullTableName}:`,
+        sql: data.sql || data.query,
+        explanation: data.explanation,
+        confidence: data.confidence,
+        timestamp: new Date(),
+      };
+      setMessages(prev => [...prev, queryMessage]);
+      
+    } catch (error: any) {
+      const errorMessage: Message = {
+        id: Date.now().toString(),
+        role: "assistant",
+        content: "Failed to generate query for the selected table. Please try again.",
+        error: error.message,
+        timestamp: new Date(),
+      };
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   const handleClearChat = () => {
     const clearedMessages: Message[] = [
       {
@@ -525,8 +748,21 @@ export default function AIAssistantPage() {
         <main className="flex-1 overflow-hidden">
           <div className="h-full flex">
             {/* Conversation Sidebar */}
-            {showConversationSidebar && (
-              <div className="w-80 border-r bg-muted/30 flex flex-col">
+            <motion.div 
+              className="border-r bg-muted/30 flex flex-col overflow-hidden"
+              initial={false}
+              animate={{ 
+                width: showConversationSidebar ? 320 : 0,
+                opacity: showConversationSidebar ? 1 : 0
+              }}
+              transition={{ 
+                type: "spring", 
+                stiffness: 300, 
+                damping: 30,
+                opacity: { duration: 0.2 }
+              }}
+            >
+              <div className="w-80 flex flex-col h-full">
                 <div className="p-4 border-b">
                   <div className="flex items-center justify-between mb-3">
                     <h3 className="font-semibold flex items-center gap-2">
@@ -585,7 +821,7 @@ export default function AIAssistantPage() {
                         <Card
                           key={conversation.id}
                           className={cn(
-                            "cursor-pointer transition-colors hover:bg-accent/50",
+                            "group cursor-pointer transition-colors hover:bg-accent/50",
                             conversation.isActive || conversation.id === currentConversation?.id
                               ? "bg-accent border-primary/50"
                               : ""
@@ -608,9 +844,22 @@ export default function AIAssistantPage() {
                                   </span>
                                 </div>
                               </div>
-                              {conversation.isActive && (
-                                <div className="h-2 w-2 bg-green-500 rounded-full" />
-                              )}
+                              <div className="flex items-center gap-1">
+                                {conversation.isActive && (
+                                  <div className="h-2 w-2 bg-green-500 rounded-full" />
+                                )}
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 p-0"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    deleteConversation(conversation.id);
+                                  }}
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </div>
                             </div>
                           </CardContent>
                         </Card>
@@ -619,7 +868,7 @@ export default function AIAssistantPage() {
                   )}
                 </div>
               </div>
-            )}
+            </motion.div>
 
 
             {/* Main Chat Area */}
@@ -714,14 +963,22 @@ export default function AIAssistantPage() {
               {/* Chat Messages */}
               <ScrollArea className="flex-1 p-4">
               <div className="max-w-4xl mx-auto space-y-4">
-                {messages.map((message) => (
-                  <div
-                    key={message.id}
-                    className={cn(
-                      "flex gap-3",
-                      message.role === "user" ? "justify-end" : "justify-start"
-                    )}
-                  >
+                <AnimatePresence initial={false}>
+                  {messages.map((message, index) => (
+                    <motion.div
+                      key={message.id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -20 }}
+                      transition={{ 
+                        duration: 0.3,
+                        delay: index * 0.05
+                      }}
+                      className={cn(
+                        "flex gap-3",
+                        message.role === "user" ? "justify-end" : "justify-start"
+                      )}
+                    >
                     {message.role === "assistant" && (
                       <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
                         <Bot className="h-5 w-5 text-primary" />
@@ -749,9 +1006,11 @@ export default function AIAssistantPage() {
                         <Card>
                           <CardHeader className="pb-3">
                             <div className="flex items-center justify-between">
-                              <CardTitle className="text-sm">Generated SQL</CardTitle>
+                              <CardTitle className="text-sm">
+                                {message.isExploration ? "Exploration Query" : "Generated SQL"}
+                              </CardTitle>
                               <div className="flex items-center gap-2">
-                                {message.confidence && (
+                                {message.confidence && !message.isExploration && (
                                   <Badge variant="outline" className="text-xs">
                                     {message.confidence}% confidence
                                   </Badge>
@@ -763,13 +1022,15 @@ export default function AIAssistantPage() {
                                 >
                                   <Copy className="h-3 w-3" />
                                 </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleExecuteSQL(message.sql!)}
-                                >
-                                  <Play className="h-3 w-3" />
-                                </Button>
+                                {!message.isExploration && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleExecuteSQL(message.sql!)}
+                                  >
+                                    <Play className="h-3 w-3" />
+                                  </Button>
+                                )}
                               </div>
                             </div>
                           </CardHeader>
@@ -787,6 +1048,59 @@ export default function AIAssistantPage() {
                               }}
                               className="text-sm"
                             />
+                            {message.isExploration && message.requiresConfirmation && (
+                              <div className="mt-4 p-4 bg-muted/50 rounded-lg border border-primary/20">
+                                <div className="flex items-start gap-3">
+                                  <Info className="h-5 w-5 text-primary mt-0.5" />
+                                  <div className="flex-1">
+                                    <p className="text-sm font-medium mb-1">Schema Exploration</p>
+                                    <p className="text-xs text-muted-foreground mb-3">
+                                      This query will help me understand your database structure better. 
+                                      Would you like me to execute it?
+                                    </p>
+                                    <div className="flex gap-2">
+                                      <Button
+                                        size="sm"
+                                        variant="default"
+                                        onClick={() => handleExecuteExploration(message.id, message.sql!)}
+                                      >
+                                        <CheckCircle className="h-4 w-4 mr-1" />
+                                        Yes, Execute
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => {
+                                          // Mark as cancelled
+                                          setMessages(prev => prev.map(msg => 
+                                            msg.id === message.id 
+                                              ? { ...msg, requiresConfirmation: false }
+                                              : msg
+                                          ));
+                                        }}
+                                      >
+                                        Cancel
+                                      </Button>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                            {message.explorationResults && (
+                              <div className="mt-4 p-3 bg-muted rounded-lg">
+                                <h4 className="text-sm font-medium mb-2">Exploration Results:</h4>
+                                <div className="text-xs">
+                                  <p>Found {message.explorationResults.rowCount} results</p>
+                                  {message.explorationResults.rows && message.explorationResults.rows.length > 0 && (
+                                    <div className="mt-2 max-h-48 overflow-auto">
+                                      <pre className="text-xs">
+                                        {JSON.stringify(message.explorationResults.rows, null, 2)}
+                                      </pre>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            )}
                           </CardContent>
                         </Card>
                       )}
@@ -809,26 +1123,65 @@ export default function AIAssistantPage() {
                         <User className="h-5 w-5 text-primary-foreground" />
                       </div>
                     )}
-                  </div>
+                  </motion.div>
                 ))}
+                </AnimatePresence>
                 
-                {isGenerating && (
-                  <div className="flex gap-3">
-                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                      <Bot className="h-5 w-5 text-primary animate-pulse" />
-                    </div>
-                    <div className="bg-muted rounded-lg px-4 py-2">
-                      <div className="flex items-center gap-2">
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        <span className="text-sm">Generating SQL query...</span>
+                <AnimatePresence>
+                  {isGenerating && (
+                    <motion.div 
+                      className="flex gap-3"
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -20 }}
+                      transition={{ duration: 0.3 }}
+                    >
+                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                        <Bot className="h-5 w-5 text-primary animate-pulse" />
                       </div>
-                    </div>
-                  </div>
-                )}
+                      <div className="bg-muted rounded-lg px-4 py-2">
+                        <div className="flex items-center gap-2">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          <span className="text-sm">Generating SQL query...</span>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
                 
                 <div ref={messagesEndRef} />
               </div>
               </ScrollArea>
+
+              {/* Table Selector Modal */}
+              <AnimatePresence>
+                {showTableSelector && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="absolute inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+                  >
+                    <motion.div
+                      initial={{ scale: 0.95, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      exit={{ scale: 0.95, opacity: 0 }}
+                      className="w-full max-w-4xl"
+                    >
+                      <TableSelector
+                        tables={explorationTables}
+                        onSelect={handleTableSelect}
+                        onCancel={() => setShowTableSelector(false)}
+                        searchKeywords={
+                          userQuery.toLowerCase().includes("role") ? ["role", "user", "auth", "permission"] :
+                          userQuery.toLowerCase().includes("user") ? ["user", "account", "member", "person"] :
+                          []
+                        }
+                      />
+                    </motion.div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
               {/* Input Area */}
               <div className="border-t bg-background p-4">

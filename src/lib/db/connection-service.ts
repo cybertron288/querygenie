@@ -7,7 +7,7 @@
 import { db } from "@/lib/db";
 import { connections } from "@/lib/db/schema";
 import { encrypt, decrypt } from "@/lib/encryption";
-import { eq, and } from "drizzle-orm";
+import { eq, and, isNull } from "drizzle-orm";
 import { Client as PgClient } from "pg";
 import mysql from "mysql2/promise";
 import Database from "better-sqlite3";
@@ -135,7 +135,7 @@ export async function getConnectionConfig(connectionId: string): Promise<Connect
     const [connection] = await db
       .select()
       .from(connections)
-      .where(and(eq(connections.id, connectionId), eq(connections.deletedAt, null)))
+      .where(and(eq(connections.id, connectionId), isNull(connections.deletedAt)))
       .limit(1);
 
     if (!connection) {
