@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
     const result = await testConnection({
       ...validatedData,
       name: "test", // Name is not needed for testing
-    });
+    } as any);
 
     return NextResponse.json({
       success: result.success,

@@ -125,22 +125,25 @@ async function testMysqlConnection(
   config: ConnectionConfig
 ): Promise<TestResult> {
   try {
-    const connection = await mysql.createConnection({
+    const connectionConfig: any = {
       host: config.host,
       port: config.port || 3306,
       database: config.database,
       user: config.username,
       password: config.password,
-      ssl: config.sslConfig?.enabled
-        ? {
-            rejectUnauthorized: config.sslConfig.rejectUnauthorized ?? true,
-            ca: config.sslConfig.ca,
-            cert: config.sslConfig.cert,
-            key: config.sslConfig.key,
-          }
-        : undefined,
       connectTimeout: 10000,
-    });
+    };
+    
+    if (config.sslConfig?.enabled) {
+      connectionConfig.ssl = {
+        rejectUnauthorized: config.sslConfig.rejectUnauthorized ?? true,
+        ca: config.sslConfig.ca,
+        cert: config.sslConfig.cert,
+        key: config.sslConfig.key,
+      };
+    }
+    
+    const connection = await mysql.createConnection(connectionConfig);
 
     // Get server version and metadata
     const [versionRows]: any = await connection.execute("SELECT VERSION() as version");
@@ -322,21 +325,24 @@ async function getPostgresSchema(config: ConnectionConfig): Promise<any> {
  * Get MySQL schema
  */
 async function getMysqlSchema(config: ConnectionConfig): Promise<any> {
-  const connection = await mysql.createConnection({
+  const connectionConfig: any = {
     host: config.host,
     port: config.port || 3306,
     database: config.database,
     user: config.username,
     password: config.password,
-    ssl: config.sslConfig?.enabled
-      ? {
-          rejectUnauthorized: config.sslConfig.rejectUnauthorized ?? true,
-          ca: config.sslConfig.ca,
-          cert: config.sslConfig.cert,
-          key: config.sslConfig.key,
-        }
-      : undefined,
-  });
+  };
+  
+  if (config.sslConfig?.enabled) {
+    connectionConfig.ssl = {
+      rejectUnauthorized: config.sslConfig.rejectUnauthorized ?? true,
+      ca: config.sslConfig.ca,
+      cert: config.sslConfig.cert,
+      key: config.sslConfig.key,
+    };
+  }
+  
+  const connection = await mysql.createConnection(connectionConfig);
 
   try {
     const [tables]: any = await connection.execute(

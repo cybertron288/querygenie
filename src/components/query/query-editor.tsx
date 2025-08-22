@@ -18,7 +18,6 @@ import { cn } from "@/lib/utils";
 import CodeMirror from "@uiw/react-codemirror";
 import { sql } from "@codemirror/lang-sql";
 import { oneDark } from "@codemirror/theme-one-dark";
-import { useTheme } from "next-themes";
 
 interface QueryEditorProps {
   workspaceId: string;
@@ -33,11 +32,10 @@ export function QueryEditor({
   onExecute,
   initialQuery = "",
 }: QueryEditorProps) {
-  const { theme } = useTheme();
   const { toast } = useToast();
   const [query, setQuery] = useState(initialQuery);
   const [isExecuting, setIsExecuting] = useState(false);
-  const [selectedConnection, setSelectedConnection] = useState(connectionId);
+  const [selectedConnection, setSelectedConnection] = useState(connectionId || "");
   const [aiPrompt, setAiPrompt] = useState("");
   const [showAiPanel, setShowAiPanel] = useState(false);
   const [queryTabs, setQueryTabs] = useState([
@@ -193,9 +191,12 @@ export function QueryEditor({
     if (queryTabs.length === 1) return;
     
     const newTabs = queryTabs.filter(t => t.id !== tabId);
-    if (activeTab === tabId) {
-      setActiveTab(newTabs[0].id);
-      setQuery(newTabs[0].query);
+    if (activeTab === tabId && newTabs.length > 0) {
+      const firstTab = newTabs[0];
+      if (firstTab) {
+        setActiveTab(firstTab.id);
+        setQuery(firstTab.query);
+      }
     }
     setQueryTabs(newTabs);
   };
@@ -324,7 +325,7 @@ export function QueryEditor({
         <CodeMirror
           value={query}
           height="100%"
-          theme={theme === "dark" ? oneDark : undefined}
+          theme={oneDark}
           extensions={[sql()]}
           onChange={(value) => {
             setQuery(value);

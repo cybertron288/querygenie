@@ -119,17 +119,22 @@ async function getPostgresSchema(config: any): Promise<SchemaInfo> {
       const existingColumn = table.columns.find(c => c.name === row.column_name);
       
       if (!existingColumn) {
-        table.columns.push({
+        const columnInfo: ColumnInfo = {
           name: row.column_name,
           type: row.data_type,
           nullable: row.is_nullable === 'YES',
           isPrimary: row.constraint_type === 'PRIMARY KEY',
           isForeign: row.constraint_type === 'FOREIGN KEY',
-          references: row.foreign_table_name ? {
+        };
+        
+        if (row.foreign_table_name) {
+          columnInfo.references = {
             table: `${row.foreign_table_schema}.${row.foreign_table_name}`,
             column: row.foreign_column_name,
-          } : undefined,
-        });
+          };
+        }
+        
+        table.columns.push(columnInfo);
       } else {
         // Update existing column with additional constraint info
         if (row.constraint_type === 'PRIMARY KEY') {
@@ -215,17 +220,22 @@ async function getMySQLSchema(config: any): Promise<SchemaInfo> {
 
       const table = tablesMap.get(col.table_name)!;
       
-      table.columns.push({
+      const columnInfo: ColumnInfo = {
         name: col.column_name,
         type: col.data_type,
         nullable: col.is_nullable === 'YES',
         isPrimary: col.column_key === 'PRI',
         isForeign: !!col.foreign_table,
-        references: col.foreign_table ? {
+      };
+      
+      if (col.foreign_table) {
+        columnInfo.references = {
           table: col.foreign_table,
           column: col.foreign_column,
-        } : undefined,
-      });
+        };
+      }
+      
+      table.columns.push(columnInfo);
     }
 
     return {
@@ -266,17 +276,22 @@ async function getSQLiteSchema(config: any): Promise<SchemaInfo> {
         columns: columns.map((col: any) => {
           const fk = foreignKeys.find((f: any) => f.from === col.name);
           
-          return {
+          const columnInfo: ColumnInfo = {
             name: col.name,
             type: col.type,
             nullable: col.notnull === 0,
             isPrimary: col.pk === 1,
             isForeign: !!fk,
-            references: fk ? {
+          };
+          
+          if (fk) {
+            columnInfo.references = {
               table: fk.table,
               column: fk.to,
-            } : undefined,
-          };
+            };
+          }
+          
+          return columnInfo;
         }),
       };
 
@@ -367,6 +382,7 @@ export function generateTableSuggestions(tables: TableInfo[]): string {
 
   if (tables.length === 1) {
     const table = tables[0];
+    if (!table) return "I couldn't find any tables matching your description.";
     const fullName = table.schema ? `${table.schema}.${table.tableName}` : table.tableName;
     return `I found the table: **${fullName}**`;
   }
@@ -376,6 +392,7 @@ export function generateTableSuggestions(tables: TableInfo[]): string {
   
   for (let i = 0; i < Math.min(5, tables.length); i++) {
     const table = tables[i];
+    if (!table) continue;
     const fullName = table.schema ? `${table.schema}.${table.tableName}` : table.tableName;
     const columnNames = table.columns.slice(0, 5).map(c => c.name).join(', ');
     

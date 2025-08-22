@@ -48,7 +48,8 @@ export async function GET(
     const hasPermission = await checkPermission(
       session.user.id,
       workspaceId,
-      "queries:read"
+      "queries",
+      "view"
     );
 
     if (!hasPermission) {
@@ -110,10 +111,12 @@ export async function GET(
       .offset(offset);
 
     // Get total count
-    const [{ count }] = await db
+    const countResult = await db
       .select({ count: sql`count(*)`.mapWith(Number) })
       .from(queries)
       .where(and(...conditions));
+    
+    const count = countResult[0]?.count || 0;
 
     return NextResponse.json({
       data: workspaceQueries,
@@ -162,7 +165,8 @@ export async function POST(
     const hasPermission = await checkPermission(
       session.user.id,
       workspaceId,
-      "queries:execute"
+      "queries",
+      "execute"
     );
 
     if (!hasPermission) {
@@ -203,7 +207,7 @@ export async function POST(
       const generatedQuery = await generateSQLQuery({
         prompt: validatedData.prompt,
         connectionType: connection.type,
-        model: validatedData.model,
+        model: validatedData.model || "gemini",
         includeExamples: validatedData.includeExamples,
         temperature: validatedData.temperature,
         schema: {}, // TODO: Get actual schema from connection
@@ -276,8 +280,19 @@ export async function POST(
 
       // Execute the query
       const startTime = new Date();
+      const connectionConfig: any = {
+        type: connection.type,
+        database: connection.database || "",
+        password: connection.encryptedCredentials || "",
+      };
+      
+      if (connection.host) connectionConfig.host = connection.host;
+      if (connection.port) connectionConfig.port = connection.port;
+      if (connection.username) connectionConfig.username = connection.username;
+      if (connection.sslConfig) connectionConfig.sslConfig = JSON.stringify(connection.sslConfig);
+      
       const result = await executeQuery({
-        connection,
+        connection: connectionConfig,
         sqlQuery: validatedData.sqlQuery,
         limit: validatedData.limit,
         timeout: validatedData.timeout,
@@ -289,35 +304,37 @@ export async function POST(
         // Save query if requested
         if (validatedData.isSaved) {
           await tx.insert(queries).values({
-            id: queryId,
             workspaceId,
             connectionId: validatedData.connectionId,
             title: validatedData.title || "Untitled Query",
             sqlQuery: validatedData.sqlQuery,
-            description: validatedData.description,
+            description: validatedData.description || null,
             isSaved: true,
             isShared: false,
-            tags: validatedData.tags,
+            tags: validatedData.tags || null,
             createdById: session.user.id,
-            createdAt: new Date(),
-            updatedAt: new Date(),
           });
         }
 
-        // Save execution record
-        await tx.insert(queryExecutions).values({
-          id: executionId,
-          queryId: validatedData.isSaved ? queryId : null,
-          workspaceId,
-          connectionId: validatedData.connectionId,
-          sqlQuery: validatedData.sqlQuery,
-          executedById: session.user.id,
-          status: result.success ? "success" : "error",
-          rowCount: result.rowCount,
-          executionTimeMs: endTime.getTime() - startTime.getTime(),
-          error: result.error || null,
-          createdAt: startTime,
-        });
+        // Save execution record if query was saved
+        if (validatedData.isSaved) {
+          const queryResult = await tx.select({ id: queries.id }).from(queries)
+            .where(eq(queries.workspaceId, workspaceId))
+            .orderBy(queries.createdAt)
+            .limit(1);
+          
+          if (queryResult[0]) {
+            await tx.insert(queryExecutions).values({
+              queryId: queryResult[0].id,
+              executedById: session.user.id,
+              status: result.success ? "completed" : "failed",
+              rowCount: result.rowCount || 0,
+              duration: endTime.getTime() - startTime.getTime(),
+              errorMessage: result.error || null,
+              completedAt: endTime,
+            });
+          }
+        }
       });
 
       // Log audit event

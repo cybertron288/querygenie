@@ -7,12 +7,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth/config";
-import { generateSQLQuery } from "@/lib/ai/query-generator";
 import { generateEnhancedSQLQuery } from "@/lib/ai/enhanced-query-generator";
 import { getSchemaInfo } from "@/lib/db/schema-introspection";
 import { getConnectionConfig } from "@/lib/db/connection-service";
 import { db } from "@/lib/db";
-import { connections, workspaces, memberships, conversations, aiMessages } from "@/lib/db/schema";
+import { connections, memberships, conversations, aiMessages } from "@/lib/db/schema";
 import { eq, and, isNull, sql, asc } from "drizzle-orm";
 import { z } from "zod";
 
@@ -49,7 +48,7 @@ export async function POST(request: NextRequest) {
     let connectionType = "postgres"; // Default
     let connectionConfig = null;
     let schemaInfo = null;
-    let conversationHistory = [];
+    let conversationHistory: any[] = [];
 
     if (validatedData.connectionId) {
       // Fetch connection details
@@ -84,7 +83,7 @@ export async function POST(request: NextRequest) {
         .where(
           and(
             eq(memberships.userId, session.user.id),
-            eq(memberships.workspaceId, connection[0].workspaceId),
+            eq(memberships.workspaceId, connection[0]!.workspaceId),
             eq(memberships.isActive, true)
           )
         )
@@ -97,7 +96,7 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      connectionType = connection[0].type;
+      connectionType = connection[0]!.type;
 
       // Get connection config for schema introspection
       try {
@@ -127,15 +126,20 @@ export async function POST(request: NextRequest) {
     }
 
     // Use enhanced SQL generation with schema awareness
-    const result = await generateEnhancedSQLQuery({
+    const generateOptions: any = {
       prompt: validatedData.prompt,
       connectionType,
       connectionConfig,
-      schemaInfo,
       conversationHistory,
       model: validatedData.model as any,
       temperature: 0.3,
-    });
+    };
+    
+    if (schemaInfo) {
+      generateOptions.schemaInfo = schemaInfo;
+    }
+    
+    const result = await generateEnhancedSQLQuery(generateOptions);
 
     // If conversation ID is provided, save messages to conversation
     if (validatedData.conversationId) {
@@ -243,45 +247,3 @@ export async function POST(request: NextRequest) {
   }
 }
 
-/**
- * Get schema information for a connection
- * In production, this would query the actual database
- */
-async function getConnectionSchema(connectionId: string): Promise<Record<string, any>> {
-  // Mock schema for demonstration
-  // In production, you would:
-  // 1. Get connection credentials from encrypted storage
-  // 2. Connect to the database
-  // 3. Query information_schema or equivalent
-  // 4. Return the actual schema
-  
-  return {
-    users: {
-      columns: [
-        { name: "id", type: "uuid", nullable: false },
-        { name: "email", type: "varchar(255)", nullable: false },
-        { name: "name", type: "varchar(255)", nullable: true },
-        { name: "created_at", type: "timestamp", nullable: false },
-        { name: "updated_at", type: "timestamp", nullable: false },
-      ],
-    },
-    orders: {
-      columns: [
-        { name: "id", type: "uuid", nullable: false },
-        { name: "user_id", type: "uuid", nullable: false },
-        { name: "status", type: "varchar(50)", nullable: false },
-        { name: "total_amount", type: "decimal(10,2)", nullable: false },
-        { name: "created_at", type: "timestamp", nullable: false },
-      ],
-    },
-    products: {
-      columns: [
-        { name: "id", type: "uuid", nullable: false },
-        { name: "name", type: "varchar(255)", nullable: false },
-        { name: "price", type: "decimal(10,2)", nullable: false },
-        { name: "stock_quantity", type: "integer", nullable: false },
-        { name: "category", type: "varchar(100)", nullable: true },
-      ],
-    },
-  };
-}

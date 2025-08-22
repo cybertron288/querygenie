@@ -87,7 +87,7 @@ export async function PATCH(
  * Delete an API key
  */
 export async function DELETE(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: { keyId: string } }
 ) {
   try {

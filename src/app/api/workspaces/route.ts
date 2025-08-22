@@ -62,7 +62,7 @@ export async function GET(request: NextRequest) {
       .offset(offset);
 
     // Get total count
-    const [{ count }] = await db
+    const countResult = await db
       .select({ count: sql`count(*)`.mapWith(Number) })
       .from(memberships)
       .innerJoin(workspaces, eq(memberships.workspaceId, workspaces.id))
@@ -73,6 +73,8 @@ export async function GET(request: NextRequest) {
           eq(workspaces.isActive, true)
         )
       );
+    
+    const count = countResult[0]?.count || 0;
 
     // Format response
     const data = userWorkspaces.map(({ workspace, membership }) => ({
@@ -149,8 +151,8 @@ export async function POST(request: NextRequest) {
         id: workspaceId,
         name: validatedData.name,
         slug: validatedData.slug,
-        description: validatedData.description,
-        avatar: validatedData.avatar,
+        description: validatedData.description || null,
+        avatar: validatedData.avatar || null,
         ownerId: session.user.id,
         settings: {},
         createdAt: new Date(),

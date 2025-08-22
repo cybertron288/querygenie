@@ -1,9 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { Suspense, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { motion, AnimatePresence } from "framer-motion";
 import {
   Play,
   Save,
@@ -12,7 +11,6 @@ import {
   FileDown,
   Maximize2,
   Minimize2,
-  Share2,
   History,
   AlertCircle,
   CheckCircle,
@@ -23,13 +21,11 @@ import {
 import CodeMirror from '@uiw/react-codemirror';
 import { sql as sqlLang } from '@codemirror/lang-sql';
 import { oneDark } from '@codemirror/theme-one-dark';
-import { useTheme } from "next-themes";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Header } from "@/components/layout/header";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import {
   Select,
@@ -56,8 +52,6 @@ import {
 } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
-import { AnimatedPage } from "@/components/ui/animated-page";
-import { fadeInVariants, staggerContainer, staggerItem } from "@/lib/animations";
 
 interface Connection {
   id: string;
@@ -67,10 +61,9 @@ interface Connection {
   isActive: boolean;
 }
 
-export default function QueryEditorPage() {
+function QueryEditorContent() {
   const router = useRouter();
   const { data: session } = useSession();
-  const { theme } = useTheme();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
@@ -97,7 +90,7 @@ export default function QueryEditorPage() {
 
   // Get workspace ID from session - using the first workspace from memberships
   // Use the Acme Corp workspace ID which has the connections
-  const workspaceId = session?.workspaces?.[0]?.id || session?.user?.memberships?.[0]?.workspaceId || "ddd3f516-4520-4987-b14e-768b9092d2f8";
+  const workspaceId = (session as any)?.workspaces?.[0]?.id || "ddd3f516-4520-4987-b14e-768b9092d2f8";
 
   // Load connections
   useEffect(() => {
@@ -235,13 +228,13 @@ export default function QueryEditorPage() {
         return row.map(escapeCsvValue);
       } else {
         // Row is an object, extract values by column order
-        return results.columns.map(col => escapeCsvValue(row[col]));
+        return results.columns.map((col: any) => escapeCsvValue(row[col]));
       }
     });
 
     const csv = [
       results.columns.map(escapeCsvValue).join(','),
-      ...rows.map(row => row.join(','))
+      ...rows.map((row: any) => row.join(','))
     ].join('\n');
 
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -256,7 +249,7 @@ export default function QueryEditorPage() {
       if (Array.isArray(row)) {
         // Convert array to object using column names
         const obj: any = {};
-        results.columns.forEach((col, idx) => {
+        results.columns.forEach((col: any, idx: number) => {
           obj[col] = row[idx];
         });
         return obj;
@@ -291,7 +284,7 @@ export default function QueryEditorPage() {
         });
       } else {
         // Row is an object, extract values by column order
-        return results.columns.map(col => {
+        return results.columns.map((col: any) => {
           const value = row[col];
           if (value === null || value === undefined) return '';
           return String(value).replace(/\t/g, ' ');
@@ -302,7 +295,7 @@ export default function QueryEditorPage() {
     // Create a simple TSV format that Excel can open
     const tsv = [
       results.columns.join('\t'),
-      ...rows.map(row => row.join('\t'))
+      ...rows.map((row: any) => row.join('\t'))
     ].join('\n');
 
     const blob = new Blob([tsv], { type: 'application/vnd.ms-excel;charset=utf-8;' });
@@ -639,5 +632,17 @@ export default function QueryEditorPage() {
         </main>
       </div>
     </div>
+  );
+}
+
+export default function QueryEditorPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex h-screen items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    }>
+      <QueryEditorContent />
+    </Suspense>
   );
 }

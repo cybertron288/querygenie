@@ -56,16 +56,16 @@ export async function createConnection(
     }
 
     // Store connection in database
-    const [connection] = await db
+    const result = await db
       .insert(connections)
       .values({
         workspaceId,
         name: config.name,
         type: config.type as any,
-        host: config.host,
-        port: config.port,
-        database: config.database,
-        username: config.username,
+        host: config.host || null,
+        port: config.port || null,
+        database: config.database || null,
+        username: config.username || null,
         encryptedCredentials: JSON.stringify(encryptedCreds),
         sslConfig: config.sslConfig || {},
         createdById: userId,
@@ -73,7 +73,11 @@ export async function createConnection(
       })
       .returning({ id: connections.id });
 
-    return connection.id;
+    if (!result[0]) {
+      throw new Error("Failed to create connection");
+    }
+    
+    return result[0].id;
   } catch (error: any) {
     console.error("Failed to create connection:", error);
     throw new Error(`Failed to create connection: ${error.message}`);
@@ -162,18 +166,21 @@ export async function getConnectionConfig(connectionId: string): Promise<Connect
       }
     }
 
-    return {
+    const config: ConnectionConfig = {
       type: connection.type as any,
       name: connection.name,
-      host: connection.host || undefined,
-      port: connection.port || undefined,
-      database: connection.database || undefined,
-      username: connection.username || undefined,
-      password: decryptedPassword,
-      connectionString: decryptedConnectionString,
-      ssl: connection.sslConfig?.enabled || false,
+      ssl: (connection.sslConfig as any)?.enabled || false,
       sslConfig: connection.sslConfig as any,
     };
+    
+    if (connection.host) config.host = connection.host;
+    if (connection.port) config.port = connection.port;
+    if (connection.database) config.database = connection.database;
+    if (connection.username) config.username = connection.username;
+    if (decryptedPassword) config.password = decryptedPassword;
+    if (decryptedConnectionString) config.connectionString = decryptedConnectionString;
+    
+    return config;
   } catch (error: any) {
     console.error("Failed to get connection config:", error);
     throw new Error(`Failed to get connection config: ${error.message}`);

@@ -327,7 +327,7 @@ User's conversation history:
 function parseIntelligentResponse(text: string): GeneratedResponse {
   // Check for exploration format
   const explorationMatch = text.match(/<exploration>\s*<message>([\s\S]*?)<\/message>\s*<query>([\s\S]*?)<\/query>\s*<\/exploration>/);
-  if (explorationMatch) {
+  if (explorationMatch && explorationMatch[1] && explorationMatch[2]) {
     return {
       type: "exploration",
       explorationQuery: explorationMatch[2].trim(),
@@ -340,18 +340,18 @@ function parseIntelligentResponse(text: string): GeneratedResponse {
   const queryMatch = text.match(/<query>([\s\S]*?)<\/query>/);
   const explanationMatch = text.match(/<explanation>([\s\S]*?)<\/explanation>/);
   
-  if (queryMatch) {
+  if (queryMatch && queryMatch[1]) {
     return {
       type: "query",
       query: queryMatch[1].trim(),
-      explanation: explanationMatch ? explanationMatch[1].trim() : "Query generated successfully",
+      explanation: explanationMatch && explanationMatch[1] ? explanationMatch[1].trim() : "Query generated successfully",
       confidence: 85,
     };
   }
   
   // Check for clarification format
   const clarificationMatch = text.match(/<clarification>([\s\S]*?)<\/clarification>/);
-  if (clarificationMatch) {
+  if (clarificationMatch && clarificationMatch[1]) {
     return {
       type: "clarification",
       message: clarificationMatch[1].trim(),
@@ -360,7 +360,7 @@ function parseIntelligentResponse(text: string): GeneratedResponse {
   
   // Fallback: Check for SQL in code blocks
   const sqlMatch = text.match(/```sql\n?([\s\S]*?)```/);
-  if (sqlMatch) {
+  if (sqlMatch && sqlMatch[1]) {
     const query = sqlMatch[1].trim();
     const explanation = text.replace(/```sql\n?[\s\S]*?```/, '').trim();
     

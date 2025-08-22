@@ -62,17 +62,20 @@ interface AuditLogOptions {
  */
 export async function auditLog(options: AuditLogOptions): Promise<void> {
   try {
+    // Map the dotted action format to simple enum values
+    const simpleAction = options.action.includes('.') 
+      ? options.action.split('.').pop() as any
+      : options.action as any;
+    
     await db.insert(auditLogs).values({
-      id: nanoid(),
       workspaceId: options.workspaceId || null,
       userId: options.userId,
-      action: options.action,
+      action: simpleAction,
       resource: options.resource,
       resourceId: options.resourceId || null,
       metadata: options.metadata || {},
       ipAddress: options.ipAddress || null,
       userAgent: options.userAgent || null,
-      createdAt: new Date(),
     });
   } catch (error) {
     // Log to console but don't throw - audit failures shouldn't break the app
@@ -89,18 +92,23 @@ export async function batchAuditLog(
   if (events.length === 0) return;
 
   try {
-    const logs = events.map(event => ({
-      id: nanoid(),
-      workspaceId: event.workspaceId || null,
-      userId: event.userId,
-      action: event.action,
-      resource: event.resource,
-      resourceId: event.resourceId || null,
-      metadata: event.metadata || {},
-      ipAddress: event.ipAddress || null,
-      userAgent: event.userAgent || null,
-      createdAt: new Date(),
-    }));
+    const logs = events.map(event => {
+      // Map the dotted action format to simple enum values
+      const simpleAction = event.action.includes('.') 
+        ? event.action.split('.').pop() as any
+        : event.action as any;
+      
+      return {
+        workspaceId: event.workspaceId || null,
+        userId: event.userId,
+        action: simpleAction,
+        resource: event.resource,
+        resourceId: event.resourceId || null,
+        metadata: event.metadata || {},
+        ipAddress: event.ipAddress || null,
+        userAgent: event.userAgent || null,
+      };
+    });
 
     await db.insert(auditLogs).values(logs);
   } catch (error) {
@@ -114,7 +122,8 @@ export async function batchAuditLog(
 export function getIpAddress(request: Request): string {
   const forwardedFor = request.headers.get("x-forwarded-for");
   if (forwardedFor) {
-    return forwardedFor.split(",")[0].trim();
+    const firstIp = forwardedFor.split(",")[0];
+    return firstIp ? firstIp.trim() : "unknown";
   }
   
   const realIp = request.headers.get("x-real-ip");

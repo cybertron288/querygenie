@@ -18,7 +18,7 @@ import { eq, and, desc, sql } from "drizzle-orm";
 import { checkPermission } from "@/lib/auth/permissions";
 import { auditLog } from "@/lib/audit";
 import { nanoid } from "nanoid";
-import { encrypt, decrypt } from "@/lib/encryption";
+import { encrypt } from "@/lib/encryption";
 import { testDatabaseConnection } from "@/lib/db/test-connection";
 
 /**
@@ -47,7 +47,8 @@ export async function GET(
     const hasPermission = await checkPermission(
       session.user.id,
       workspaceId,
-      "connections:read"
+      "connections",
+      "view"
     );
 
     if (!hasPermission) {
@@ -80,8 +81,6 @@ export async function GET(
         database: connections.database,
         username: connections.username,
         isActive: connections.isActive,
-        lastTestedAt: connections.lastTestedAt,
-        lastTestResult: connections.lastTestResult,
         createdAt: connections.createdAt,
         updatedAt: connections.updatedAt,
       })
@@ -97,7 +96,7 @@ export async function GET(
       .offset(offset);
 
     // Get total count
-    const [{ count }] = await db
+    const countResult = await db
       .select({ count: sql`count(*)`.mapWith(Number) })
       .from(connections)
       .where(
@@ -106,6 +105,8 @@ export async function GET(
           eq(connections.isActive, true)
         )
       );
+    
+    const count = countResult[0]?.count || 0;
 
     return NextResponse.json({
       data: workspaceConnections,
@@ -154,7 +155,8 @@ export async function POST(
     const hasPermission = await checkPermission(
       session.user.id,
       workspaceId,
-      "connections:create"
+      "connections",
+      "create"
     );
 
     if (!hasPermission) {
@@ -176,7 +178,7 @@ export async function POST(
       database: validatedData.database,
       username: validatedData.username,
       password: validatedData.password,
-      sslConfig: validatedData.sslConfig,
+      sslConfig: validatedData.sslConfig as any,
     });
 
     if (!testResult.success) {
@@ -211,11 +213,9 @@ export async function POST(
         port: validatedData.port,
         database: validatedData.database,
         username: validatedData.username,
-        password: encryptedPassword,
+        encryptedCredentials: encryptedPassword,
         sslConfig: encryptedSslConfig,
         isActive: true,
-        lastTestedAt: new Date(),
-        lastTestResult: testResult.metadata,
         createdAt: new Date(),
         updatedAt: new Date(),
       })
@@ -229,8 +229,6 @@ export async function POST(
         database: connections.database,
         username: connections.username,
         isActive: connections.isActive,
-        lastTestedAt: connections.lastTestedAt,
-        lastTestResult: connections.lastTestResult,
         createdAt: connections.createdAt,
       });
 

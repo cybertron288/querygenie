@@ -277,7 +277,7 @@ async function seed() {
 
     // Create sample queries
     console.log("Creating sample queries...");
-    await db.insert(queries).values([
+    await db.insert(queries).values(
       {
         id: randomUUID(),
         workspaceId: workspaceIds.acme,
@@ -297,10 +297,13 @@ async function seed() {
         isSaved: true,
         isShared: true,
         tags: "users,analytics,daily",
-        generatedById: userIds.admin,
+        createdById: userIds.admin,
         createdAt: new Date(),
         updatedAt: new Date(),
       },
+    );
+    
+    await db.insert(queries).values(
       {
         id: randomUUID(),
         workspaceId: workspaceIds.acme,
@@ -324,10 +327,13 @@ async function seed() {
         isSaved: true,
         isShared: false,
         tags: "revenue,products,sales",
-        generatedById: userIds.john,
+        createdById: userIds.john,
         createdAt: new Date(),
         updatedAt: new Date(),
       },
+    );
+    
+    await db.insert(queries).values(
       {
         id: randomUUID(),
         workspaceId: workspaceIds.startup,
@@ -348,15 +354,15 @@ async function seed() {
         isSaved: true,
         isShared: true,
         tags: "engagement,metrics,users",
-        generatedById: userIds.john,
+        createdById: userIds.john,
         createdAt: new Date(),
         updatedAt: new Date(),
       },
-    ]);
+    );
 
     // Create sample documentation
     console.log("Creating sample documentation...");
-    await db.insert(docs).values([
+    await db.insert(docs).values(
       {
         id: randomUUID(),
         workspaceId: workspaceIds.acme,
@@ -401,6 +407,9 @@ This document describes the structure of our production database.
         createdAt: new Date(),
         updatedAt: new Date(),
       },
+    );
+    
+    await db.insert(docs).values(
       {
         id: randomUUID(),
         workspaceId: workspaceIds.startup,
@@ -430,7 +439,7 @@ This document describes the structure of our production database.
         createdAt: new Date(),
         updatedAt: new Date(),
       },
-    ]);
+    );
 
     console.log("✅ Database seed completed successfully!");
     console.log("\nTest credentials:");

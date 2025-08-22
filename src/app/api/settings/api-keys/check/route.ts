@@ -12,12 +12,15 @@ import { userApiKeys } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { decrypt } from "@/lib/encryption";
 
+// Force dynamic rendering for this route
+export const dynamic = 'force-dynamic';
+
 /**
  * GET /api/settings/api-keys/check
  * 
  * Check which API keys are available
  */
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
     
@@ -45,7 +48,7 @@ export async function GET(request: NextRequest) {
     // Set environment variables from user's API keys
     for (const key of userKeys) {
       try {
-        const decryptedKey = decrypt(key.encryptedKey);
+        const decryptedKey = await decrypt(key.encryptedKey);
         if (key.provider === "gemini") {
           process.env.GEMINI_API_KEY = decryptedKey;
         } else if (key.provider === "openai") {

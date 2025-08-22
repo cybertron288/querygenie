@@ -282,7 +282,7 @@ function formatSchemaForPrompt(schema: Record<string, any>): string {
  * Get example queries for the database type
  */
 function getExampleQueries(connectionType: string): string {
-  const examples: Record<string, string> = {
+  const examples = {
     postgres: `
 Example 1: "Show me all users created in the last week"
 <query>
@@ -335,7 +335,8 @@ ORDER BY order_count DESC;
 </query>`,
   };
 
-  return examples[connectionType] || examples.postgres;
+  const result = (examples as any)[connectionType];
+  return result || examples.postgres;
 }
 
 /**
@@ -349,7 +350,7 @@ function parseAIResponse(text: string): {
   const queryMatch = text.match(/<query>([\s\S]*?)<\/query>/);
   const explanationMatch = text.match(/<explanation>([\s\S]*?)<\/explanation>/);
   
-  if (queryMatch && explanationMatch) {
+  if (queryMatch && queryMatch[1] && explanationMatch && explanationMatch[1]) {
     return {
       query: queryMatch[1].trim(),
       explanation: explanationMatch[1].trim(),
@@ -358,7 +359,7 @@ function parseAIResponse(text: string): {
 
   // Fallback: try to find SQL query pattern
   const sqlMatch = text.match(/```sql([\s\S]*?)```/);
-  if (sqlMatch) {
+  if (sqlMatch && sqlMatch[1]) {
     return {
       query: sqlMatch[1].trim(),
       explanation: text.replace(sqlMatch[0], "").trim(),

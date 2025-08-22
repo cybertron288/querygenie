@@ -13,7 +13,6 @@ import { eq, and, isNull } from "drizzle-orm";
 import { z } from "zod";
 import {
   createConnection,
-  getConnectionConfig,
 } from "@/lib/db/connection-service";
 
 // Validation schemas
@@ -157,7 +156,7 @@ export async function POST(request: NextRequest) {
     const connectionId = await createConnection(
       validatedData.workspaceId,
       session.user.id,
-      validatedData
+      validatedData as any
     );
 
     return NextResponse.json({

@@ -9,14 +9,12 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth/config";
 import { db } from "@/lib/db";
 import { 
-  workspaces, 
   memberships, 
   connections, 
   queries,
-  queryExecutions,
 } from "@/lib/db/schema";
 import { workspaceIdParamSchema } from "@/lib/api/validation";
-import { eq, and, count, sql, desc } from "drizzle-orm";
+import { eq, and, count, sql, desc, isNull } from "drizzle-orm";
 import { checkPermission } from "@/lib/auth/permissions";
 
 /**
@@ -25,7 +23,7 @@ import { checkPermission } from "@/lib/auth/permissions";
  * Get workspace statistics and analytics
  */
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: { workspaceId: string } }
 ) {
   try {
@@ -45,7 +43,8 @@ export async function GET(
     const hasPermission = await checkPermission(
       session.user.id,
       workspaceId,
-      "workspace:read"
+      "workspace",
+      "view"
     );
 
     if (!hasPermission) {
@@ -72,7 +71,7 @@ export async function GET(
         .where(
           and(
             eq(connections.workspaceId, workspaceId),
-            eq(connections.deletedAt, null)
+            isNull(connections.deletedAt)
           )
         ),
 
@@ -96,7 +95,7 @@ export async function GET(
         .where(
           and(
             eq(queries.workspaceId, workspaceId),
-            eq(queries.deletedAt, null)
+            isNull(queries.deletedAt)
           )
         ),
 
@@ -118,7 +117,7 @@ export async function GET(
         .where(
           and(
             eq(queries.workspaceId, workspaceId),
-            eq(queries.deletedAt, null)
+            isNull(queries.deletedAt)
           )
         )
         .orderBy(desc(queries.updatedAt))
@@ -142,7 +141,7 @@ export async function GET(
         and(
           eq(queries.workspaceId, workspaceId),
           sql`${queries.createdAt} >= ${thirtyDaysAgoStr}`,
-          eq(queries.deletedAt, null)
+          isNull(queries.deletedAt)
         )
       )
       .groupBy(sql`date(${queries.createdAt})`)

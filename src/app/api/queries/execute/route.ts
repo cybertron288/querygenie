@@ -12,7 +12,6 @@ import { connections, memberships, queries } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { z } from "zod";
 import { executeQuery, validateSQLQuery } from "@/lib/db/query-executor";
-import { decrypt } from "@/lib/encryption";
 
 // Request validation schema
 const executeQuerySchema = z.object({
@@ -115,16 +114,19 @@ export async function POST(request: NextRequest) {
     }
 
     // Execute the query using existing query executor
+    const connectionConfig: any = {
+      type: connection.type,
+      database: connection.database || "",
+      password: connection.encryptedCredentials || "",
+    };
+    
+    if (connection.host) connectionConfig.host = connection.host;
+    if (connection.port) connectionConfig.port = connection.port;
+    if (connection.username) connectionConfig.username = connection.username;
+    if (connection.sslConfig) connectionConfig.sslConfig = JSON.stringify(connection.sslConfig);
+    
     const result = await executeQuery({
-      connection: {
-        type: connection.type,
-        host: connection.host || undefined,
-        port: connection.port || undefined,
-        database: connection.database || "",
-        username: connection.username || undefined,
-        password: connection.encryptedCredentials || "",
-        sslConfig: connection.sslConfig ? JSON.stringify(connection.sslConfig) : null,
-      },
+      connection: connectionConfig,
       sqlQuery: validatedData.sql,
       limit: 1000, // Default limit for safety
       timeout: 30000, // 30 second timeout
@@ -139,11 +141,11 @@ export async function POST(request: NextRequest) {
           workspaceId: connection.workspaceId,
           connectionId: connection.id,
           title: validatedData.queryName || `Query at ${new Date().toISOString()}`,
-          sql: validatedData.sql,
-          executedById: session.user.id,
+          sqlQuery: validatedData.sql,
+          createdById: session.user.id,
           executionTime,
-          rowCount: result.rowCount || 0,
-          status: "success",
+          rowsAffected: result.rowCount || 0,
+          status: "completed",
           errorMessage: null,
         });
       } catch (error) {

@@ -1,7 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useSession } from "next-auth/react";
+import { Suspense, useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { 
   Key, 
@@ -9,9 +8,6 @@ import {
   EyeOff, 
   Plus, 
   Trash2, 
-  Edit2, 
-  Save,
-  X,
   AlertCircle,
   CheckCircle,
   Sparkles,
@@ -79,14 +75,12 @@ const providerInfo = {
   },
 };
 
-export default function ApiKeysPage() {
-  const { data: session } = useSession();
+function ApiKeysContent() {
   const searchParams = useSearchParams();
   const isSetup = searchParams.get("setup") === "true";
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
   const [showKeys, setShowKeys] = useState<Record<string, boolean>>({});
-  const [editingKey, setEditingKey] = useState<string | null>(null);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -191,6 +185,7 @@ export default function ApiKeysPage() {
       const timer = setTimeout(() => setMessage(null), 5000);
       return () => clearTimeout(timer);
     }
+    return undefined;
   }, [message]);
 
   return (
@@ -452,5 +447,17 @@ export default function ApiKeysPage() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+export default function ApiKeysPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex h-screen items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    }>
+      <ApiKeysContent />
+    </Suspense>
   );
 }

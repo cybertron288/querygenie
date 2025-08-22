@@ -27,7 +27,7 @@ import { sendEmail } from "@/lib/email";
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { workspaceId: string } }
+  props: { params: { workspaceId: string } }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -40,13 +40,14 @@ export async function GET(
     }
 
     // Validate workspace ID
-    const { workspaceId } = workspaceIdParamSchema.parse(params);
+    const { workspaceId } = workspaceIdParamSchema.parse(props.params);
 
     // Check permission
     const hasPermission = await checkPermission(
       session.user.id,
       workspaceId,
-      "members:read"
+      "workspace",
+      "view"
     );
 
     if (!hasPermission) {
@@ -149,7 +150,7 @@ export async function GET(
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: { workspaceId: string } }
+  props: { params: { workspaceId: string } }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -162,13 +163,14 @@ export async function POST(
     }
 
     // Validate workspace ID
-    const { workspaceId } = workspaceIdParamSchema.parse(params);
+    const { workspaceId } = workspaceIdParamSchema.parse(props.params);
 
     // Check permission
     const hasPermission = await checkPermission(
       session.user.id,
       workspaceId,
-      "members:invite"
+      "workspace",
+      "invite"
     );
 
     if (!hasPermission) {
@@ -236,7 +238,6 @@ export async function POST(
     expiresAt.setDate(expiresAt.getDate() + 7); // 7 days expiry
 
     await db.insert(invitations).values({
-      id: invitationId,
       workspaceId,
       email: validatedData.email,
       role: validatedData.role,
@@ -244,9 +245,6 @@ export async function POST(
       token: invitationToken,
       status: "pending",
       expiresAt,
-      message: validatedData.message,
-      createdAt: new Date(),
-      updatedAt: new Date(),
     });
 
     // Send invitation email

@@ -10,7 +10,7 @@ import { authOptions } from "@/lib/auth/config";
 import { db } from "@/lib/db";
 import { connections, queries, queryExecutions } from "@/lib/db/schema";
 import { workspaceIdParamSchema } from "@/lib/api/validation";
-import { eq, and } from "drizzle-orm";
+import { eq, and, isNull } from "drizzle-orm";
 import { checkPermission } from "@/lib/auth/permissions";
 import { auditLog } from "@/lib/audit";
 import { executeQuery } from "@/lib/db/query-executor";
@@ -50,7 +50,8 @@ export async function POST(
     const hasPermission = await checkPermission(
       session.user.id,
       workspaceId,
-      "query:execute"
+      "queries",
+      "execute"
     );
 
     if (!hasPermission) {
@@ -73,7 +74,7 @@ export async function POST(
           eq(connections.id, connectionId),
           eq(connections.workspaceId, workspaceId),
           eq(connections.isActive, true),
-          eq(connections.deletedAt, null)
+          isNull(connections.deletedAt)
         )
       )
       .limit(1);
@@ -107,16 +108,19 @@ export async function POST(
 
     try {
       // Execute the query
+      const connectionConfig: any = {
+        type: connection.type,
+        database: connection.database || "",
+        password: connection.encryptedCredentials || "",
+      };
+      
+      if (connection.host) connectionConfig.host = connection.host;
+      if (connection.port) connectionConfig.port = connection.port;
+      if (connection.username) connectionConfig.username = connection.username;
+      if (connection.sslConfig) connectionConfig.sslConfig = JSON.stringify(connection.sslConfig);
+      
       queryResult = await executeQuery({
-        connection: {
-          type: connection.type,
-          host: connection.host,
-          port: connection.port,
-          database: connection.database,
-          username: connection.username,
-          password: connection.encryptedCredentials,
-          sslConfig: connection.sslConfig,
-        },
+        connection: connectionConfig,
         sqlQuery: sql,
         limit: 1000, // Default limit for safety
         timeout: 30000, // 30 second timeout
@@ -155,16 +159,14 @@ export async function POST(
 
     // Record execution in query_executions table
     await db.insert(queryExecutions).values({
-      workspaceId,
-      connectionId,
-      queryId: savedQueryId,
+      queryId: savedQueryId!,
       executedById: session.user.id,
-      sqlQuery: sql,
       status: error ? "failed" : "completed",
-      executionTime,
+      duration: executionTime,
       rowCount: queryResult?.rowCount || 0,
       errorMessage: error,
-      metadata: {
+      completedAt: new Date(),
+      serverInfo: {
         userAgent: request.headers.get("user-agent"),
         ipAddress: request.headers.get("x-forwarded-for") || request.headers.get("x-real-ip"),
       },
@@ -176,7 +178,7 @@ export async function POST(
       userId: session.user.id,
       action: "query.executed",
       resource: "query",
-      resourceId: savedQueryId || undefined,
+      resourceId: savedQueryId || "unknown",
       metadata: {
         connectionId,
         executionTime,
@@ -202,9 +204,9 @@ export async function POST(
     return NextResponse.json({
       success: true,
       data: {
-        rows: queryResult.rows,
-        columns: queryResult.columns,
-        rowCount: queryResult.rowCount,
+        rows: queryResult?.rows || [],
+        columns: queryResult?.columns || [],
+        rowCount: queryResult?.rowCount || 0,
         executionTime,
         queryId: savedQueryId,
       },

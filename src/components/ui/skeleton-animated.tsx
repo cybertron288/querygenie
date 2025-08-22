@@ -8,6 +8,7 @@ interface SkeletonProps {
   variant?: "text" | "rectangular" | "circular";
   width?: string | number;
   height?: string | number;
+  style?: React.CSSProperties;
 }
 
 export function SkeletonAnimated({
@@ -15,6 +16,7 @@ export function SkeletonAnimated({
   variant = "text",
   width,
   height,
+  style,
 }: SkeletonProps) {
   const baseStyles = "bg-gradient-to-r from-muted via-muted-foreground/10 to-muted bg-[length:200%_100%]";
   
@@ -24,10 +26,15 @@ export function SkeletonAnimated({
     circular: "rounded-full",
   };
 
+  const motionStyle: any = { width, height };
+  if (style) {
+    Object.assign(motionStyle, style);
+  }
+
   return (
     <motion.div
       className={cn(baseStyles, variantStyles[variant], className)}
-      style={{ width, height }}
+      style={motionStyle}
       animate={{
         backgroundPosition: ["200% 0", "-200% 0"],
       }}

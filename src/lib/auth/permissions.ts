@@ -108,7 +108,8 @@ export const checkPermission = cache(async (
     }
 
     // Check if user's role has required permission
-    const requiredRoles = PERMISSIONS[resource]?.[action];
+    const resourcePermissions = PERMISSIONS[resource];
+    const requiredRoles = (resourcePermissions as any)?.[action];
     if (!requiredRoles) {
       return { hasPermission: false };
     }
@@ -257,7 +258,8 @@ export const checkMultiplePermissions = cache(async (
 
   // Check each permission
   checks.forEach((check) => {
-    const requiredRoles = PERMISSIONS[check.resource]?.[check.action];
+    const resourcePermissions = PERMISSIONS[check.resource];
+    const requiredRoles = (resourcePermissions as any)?.[check.action];
     results[`${check.resource}.${check.action}`] = requiredRoles
       ? requiredRoles.includes(membership.role)
       : false;

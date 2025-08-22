@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { connectionId, query, conversationId } = executeToolSchema.parse(body);
+    const { connectionId, query } = executeToolSchema.parse(body);
 
     // Validate it's a read-only query
     const validation = validateSQLQuery(query);
@@ -115,16 +115,19 @@ export async function POST(request: NextRequest) {
     }
 
     // Execute the query with a strict limit
+    const connectionConfig: any = {
+      type: connection.type,
+      database: connection.database || "",
+      password: connection.encryptedCredentials || "",
+    };
+    
+    if (connection.host) connectionConfig.host = connection.host;
+    if (connection.port) connectionConfig.port = connection.port;
+    if (connection.username) connectionConfig.username = connection.username;
+    if (connection.sslConfig) connectionConfig.sslConfig = JSON.stringify(connection.sslConfig);
+    
     const result = await executeQuery({
-      connection: {
-        type: connection.type,
-        host: connection.host || undefined,
-        port: connection.port || undefined,
-        database: connection.database || "",
-        username: connection.username || undefined,
-        password: connection.encryptedCredentials || "",
-        sslConfig: connection.sslConfig ? JSON.stringify(connection.sslConfig) : null,
-      },
+      connection: connectionConfig,
       sqlQuery: query,
       limit: 100, // Strict limit for exploration
       timeout: 10000, // 10 second timeout

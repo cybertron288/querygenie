@@ -2,8 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
 import {
   Database,
   Plus,
@@ -17,10 +15,6 @@ import {
   Loader2,
   Shield,
   Clock,
-  Copy,
-  ExternalLink,
-  RefreshCw,
-  Zap,
   Server,
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -98,7 +92,6 @@ const connectionTypes = {
 
 export default function ConnectionsPage() {
   const { data: session } = useSession();
-  const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [connections, setConnections] = useState<Connection[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -125,7 +118,7 @@ export default function ConnectionsPage() {
 
   // Get workspace ID from session - using the first workspace from memberships
   // Use the Acme Corp workspace ID which has the connections
-  const workspaceId = session?.workspaces?.[0]?.id || session?.user?.memberships?.[0]?.workspaceId || "ddd3f516-4520-4987-b14e-768b9092d2f8";
+  const workspaceId = (session as any)?.workspaces?.[0]?.id || "ddd3f516-4520-4987-b14e-768b9092d2f8";
 
   // Load connections
   useEffect(() => {
@@ -310,6 +303,7 @@ export default function ConnectionsPage() {
       const timer = setTimeout(() => setMessage(null), 5000);
       return () => clearTimeout(timer);
     }
+    return undefined;
   }, [message]);
 
   return (

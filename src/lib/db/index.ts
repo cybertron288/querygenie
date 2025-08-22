@@ -100,9 +100,9 @@ export async function closeDatabase(): Promise<void> {
  * Provides automatic rollback on errors
  */
 export async function withTransaction<T>(
-  callback: (tx: typeof db) => Promise<T>
+  callback: (tx: any) => Promise<T>
 ): Promise<T> {
-  return db.transaction(callback);
+  return db.transaction(callback as any);
 }
 
 /**
@@ -111,10 +111,10 @@ export async function withTransaction<T>(
  */
 export function getConnectionStats() {
   return {
-    totalConnections: sql.options.max,
-    activeConnections: sql.options.max - sql.reserved,
-    idleConnections: sql.reserved,
-    waitingConnections: sql.ended ? 0 : sql.options.max - sql.options.idle_timeout,
+    totalConnections: (sql as any).options?.max || 10,
+    activeConnections: 0, // Not available in postgres.js
+    idleConnections: 0, // Not available in postgres.js
+    waitingConnections: 0, // Not available in postgres.js
   };
 }
 

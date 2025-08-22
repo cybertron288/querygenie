@@ -151,7 +151,7 @@ export function debounce<T extends (...args: any[]) => any>(
 ): (...args: Parameters<T>) => void {
   let timeout: NodeJS.Timeout;
 
-  return function executedFunction(...args: Parameters<T>) {
+  return function executedFunction(this: any, ...args: Parameters<T>) {
     const later = () => {
       clearTimeout(timeout);
       func(...args);
@@ -176,7 +176,7 @@ export function throttle<T extends (...args: any[]) => any>(
   let lastFunc: NodeJS.Timeout;
   let lastRan: number;
 
-  return function executedFunction(...args: Parameters<T>) {
+  return function executedFunction(this: any, ...args: Parameters<T>) {
     if (!inThrottle) {
       func.apply(this, args);
       lastRan = Date.now();
@@ -230,7 +230,7 @@ export function isServer(): boolean {
 export function getInitials(name: string): string {
   const parts = name.split(" ");
   if (parts.length === 1) {
-    return parts[0].substring(0, 2).toUpperCase();
+    return parts[0]!.substring(0, 2).toUpperCase();
   }
   return parts
     .slice(0, 2)
@@ -264,7 +264,7 @@ export function generateColor(seed: string): string {
   }
 
   const index = Math.abs(hash) % colors.length;
-  return colors[index];
+  return colors[index]!;
 }
 
 /**
