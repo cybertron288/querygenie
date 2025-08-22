@@ -20,7 +20,7 @@ import { auditLog } from "@/lib/audit";
  * Get a specific workspace
  */
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: { workspaceId: string } }
 ) {
   try {
@@ -40,7 +40,8 @@ export async function GET(
     const hasPermission = await checkPermission(
       session.user.id,
       workspaceId,
-      "workspace:read"
+      "workspace",
+      "view"
     );
 
     if (!hasPermission) {
@@ -124,7 +125,8 @@ export async function PATCH(
     const hasPermission = await checkPermission(
       session.user.id,
       workspaceId,
-      "workspace:update"
+      "workspace",
+      "edit"
     );
 
     if (!hasPermission) {
@@ -139,12 +141,18 @@ export async function PATCH(
     const validatedData = updateWorkspaceSchema.parse(body);
 
     // Update workspace
+    const updateData: any = {
+      updatedAt: new Date(),
+    };
+    
+    if (validatedData.name !== undefined) updateData.name = validatedData.name;
+    if (validatedData.description !== undefined) updateData.description = validatedData.description;
+    if (validatedData.avatar !== undefined) updateData.avatar = validatedData.avatar;
+    if (validatedData.settings !== undefined) updateData.settings = validatedData.settings;
+    
     const [updatedWorkspace] = await db
       .update(workspaces)
-      .set({
-        ...validatedData,
-        updatedAt: new Date(),
-      })
+      .set(updateData)
       .where(
         and(
           eq(workspaces.id, workspaceId),
@@ -204,7 +212,7 @@ export async function PATCH(
  * Delete a workspace (soft delete)
  */
 export async function DELETE(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: { workspaceId: string } }
 ) {
   try {
@@ -224,7 +232,8 @@ export async function DELETE(
     const hasPermission = await checkPermission(
       session.user.id,
       workspaceId,
-      "workspace:delete"
+      "workspace",
+      "delete"
     );
 
     if (!hasPermission) {

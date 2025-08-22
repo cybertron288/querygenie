@@ -37,7 +37,7 @@ const updateConnectionSchema = z.object({
  * Get connection details (with decrypted credentials for authorized users)
  */
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: { connectionId: string } }
 ) {
   try {
@@ -196,7 +196,7 @@ export async function PATCH(
     }
 
     // Update connection
-    await updateConnection(connectionId, session.user.id, validatedData);
+    await updateConnection(connectionId, session.user.id, validatedData as any);
 
     return NextResponse.json({
       success: true,
@@ -224,7 +224,7 @@ export async function PATCH(
  * Delete a connection (soft delete)
  */
 export async function DELETE(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: { connectionId: string } }
 ) {
   try {
@@ -299,7 +299,7 @@ export async function DELETE(
  * Test a specific connection
  */
 export async function POST(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: { connectionId: string } }
 ) {
   try {

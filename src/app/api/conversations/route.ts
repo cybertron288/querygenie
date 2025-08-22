@@ -115,10 +115,12 @@ export async function GET(request: NextRequest) {
       .offset(validated.offset);
 
     // Get total count for pagination
-    const [{ total }] = await db
+    const countResult = await db
       .select({ total: count() })
       .from(conversations)
       .where(and(...conditions));
+    
+    const total = countResult[0]?.total || 0;
 
     return NextResponse.json({
       conversations: results,
@@ -235,7 +237,7 @@ export async function POST(request: NextRequest) {
         workspaceId: connection.workspaceId,
         connectionId: validated.connectionId,
         title,
-        description: validated.description,
+        description: validated.description || null,
         createdById: session.user.id,
         isActive: true,
         messageCount: 0,
@@ -253,7 +255,7 @@ export async function POST(request: NextRequest) {
 
     // Add welcome message
     await db.insert(aiMessages).values({
-      conversationId: newConversation.id,
+      conversationId: newConversation!.id,
       role: "assistant",
       content: `Hello! I'm your AI SQL Assistant for the ${connection.name} database. I can help you generate SQL queries from natural language descriptions. What would you like to explore in your ${connection.type} database?`,
       metadata: { isWelcome: true },
@@ -263,7 +265,7 @@ export async function POST(request: NextRequest) {
     await db
       .update(conversations)
       .set({ messageCount: 1 })
-      .where(eq(conversations.id, newConversation.id));
+      .where(eq(conversations.id, newConversation!.id));
 
     return NextResponse.json({
       conversation: {

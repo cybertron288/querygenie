@@ -6,8 +6,6 @@ import {
   Database, 
   FileCode, 
   Clock, 
-  TrendingUp,
-  Plus,
   ArrowRight,
   Sparkles,
   Users,
@@ -21,7 +19,7 @@ import { DataTable } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
 import { formatRelativeDate, formatNumber } from "@/lib/utils";
 import { AnimatedPage } from "@/components/ui/animated-page";
-import { staggerContainer, staggerItem, cardVariants } from "@/lib/animations";
+import { staggerContainer, staggerItem } from "@/lib/animations";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 

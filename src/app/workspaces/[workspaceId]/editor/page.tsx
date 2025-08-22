@@ -182,7 +182,7 @@ export default function QueryEditorPage() {
                         } />
                       </SelectTrigger>
                       <SelectContent>
-                        {connections.map((conn) => (
+                        {connections.map((conn: any) => (
                           <SelectItem key={conn.id} value={conn.id}>
                             <div className="flex items-center gap-2">
                               <Database className="h-4 w-4" />
@@ -266,7 +266,7 @@ export default function QueryEditorPage() {
                       value={sqlQuery}
                       onChange={(val) => setSqlQuery(val)}
                       extensions={[sql()]}
-                      theme={theme === 'dark' ? oneDark : undefined}
+                      theme={oneDark}
                       basicSetup={{
                         lineNumbers: true,
                         highlightActiveLine: true,

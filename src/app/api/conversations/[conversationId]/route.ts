@@ -144,8 +144,8 @@ export async function GET(
       pagination: {
         limit: validated.limit,
         offset: validated.offset,
-        total: conversation.messageCount,
-        hasMore: validated.offset + validated.limit < conversation.messageCount,
+        total: conversation.messageCount || 0,
+        hasMore: validated.offset + validated.limit < (conversation.messageCount || 0),
       },
     });
 
@@ -238,13 +238,20 @@ export async function PUT(
     }
 
     // Update conversation
+    const updateData: any = {
+      updatedAt: new Date(),
+    };
+    
+    if (validated.title !== undefined) updateData.title = validated.title;
+    if (validated.description !== undefined) updateData.description = validated.description;
+    if (validated.isActive !== undefined) {
+      updateData.isActive = validated.isActive;
+      updateData.lastActivityAt = new Date();
+    }
+    
     const [updated] = await db
       .update(conversations)
-      .set({
-        ...validated,
-        updatedAt: new Date(),
-        ...(validated.isActive !== undefined && { lastActivityAt: new Date() }),
-      })
+      .set(updateData)
       .where(eq(conversations.id, params.conversationId))
       .returning({
         id: conversations.id,
@@ -282,7 +289,7 @@ export async function PUT(
  * Soft delete conversation
  */
 export async function DELETE(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: { conversationId: string } }
 ) {
   try {

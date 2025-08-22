@@ -278,7 +278,7 @@ export async function sendBulkEmails(
           to,
           subject,
           template,
-          data,
+          data: data || {},
         }).catch((error) => {
           console.error(`Failed to send email to ${to}:`, error);
         })

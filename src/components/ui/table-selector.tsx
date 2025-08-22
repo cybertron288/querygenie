@@ -28,7 +28,14 @@ interface TableSelectorProps {
 
 export function TableSelector({ tables, onSelect, onCancel, searchKeywords = [] }: TableSelectorProps) {
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedTable, setSelectedTable] = useState<TableInfo | null>(null);
+  const [selectedTable, setSelectedTable] = useState<{
+    schema: string;
+    name: string;
+    columns: string;
+    comment: string;
+    original: TableInfo;
+    highlighted?: boolean;
+  } | null>(null);
 
   // Normalize table data
   const normalizedTables = useMemo(() => {

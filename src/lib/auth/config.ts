@@ -65,11 +65,11 @@ declare module "next-auth/jwt" {
  */
 export const authOptions: NextAuthOptions = {
   // Database adapter for persisting users
-  adapter: DrizzleAdapter(db, {
+  adapter: DrizzleAdapter(db as any, {
     usersTable: users,
     accountsTable: accounts,
     sessionsTable: sessions,
-  }),
+  } as any) as any,
 
   // Session configuration
   session: {
@@ -238,7 +238,7 @@ export const authOptions: NextAuthOptions = {
 
         if (dbUser) {
           token.role = dbUser.role ?? "developer";
-          token.isActive = dbUser.isActive;
+          token.isActive = dbUser.isActive ?? true;
         }
       }
 
@@ -406,14 +406,14 @@ async function logAuditEvent({
   try {
     await db.insert(auditLogs).values({
       userId,
-      workspaceId,
+      workspaceId: workspaceId || null,
       action,
       resource,
-      resourceId,
+      resourceId: resourceId || null,
       metadata,
-      userAgent: metadata.userAgent,
-      ipAddress: metadata.ipAddress,
-      sessionId: metadata.sessionId,
+      userAgent: metadata.userAgent || null,
+      ipAddress: metadata.ipAddress || null,
+      sessionId: metadata.sessionId || null,
     });
   } catch (error) {
     console.error("Failed to log audit event:", error);

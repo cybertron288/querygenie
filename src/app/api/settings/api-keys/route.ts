@@ -11,7 +11,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { userApiKeys } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
-import { encrypt, decrypt } from "@/lib/encryption";
+import { encrypt } from "@/lib/encryption";
 import crypto from "crypto";
 
 // Validation schemas
@@ -31,7 +31,7 @@ function hashApiKey(key: string): string {
  * 
  * Get user's API keys (masked)
  */
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
     
@@ -107,7 +107,7 @@ export async function POST(request: NextRequest) {
       .limit(1);
 
     // Encrypt the API key
-    const encryptedKey = encrypt(validatedData.key);
+    const encryptedKey = await encrypt(validatedData.key);
     const keyHash = hashApiKey(validatedData.key);
 
     let keyId: string;
@@ -123,9 +123,9 @@ export async function POST(request: NextRequest) {
           isActive: true,
           updatedAt: new Date(),
         })
-        .where(eq(userApiKeys.id, existingKey[0].id));
+        .where(eq(userApiKeys.id, existingKey[0]!.id));
       
-      keyId = existingKey[0].id;
+      keyId = existingKey[0]!.id;
     } else {
       // Create new key
       const [newKey] = await db
@@ -140,7 +140,7 @@ export async function POST(request: NextRequest) {
         })
         .returning({ id: userApiKeys.id });
       
-      keyId = newKey.id;
+      keyId = newKey!.id;
     }
 
     // Also set as environment variable for immediate use

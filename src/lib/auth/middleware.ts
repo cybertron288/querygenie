@@ -102,7 +102,7 @@ export async function authMiddleware(request: NextRequest) {
   // Get JWT token
   const token = await getToken({
     req: request,
-    secret: process.env.NEXTAUTH_SECRET,
+    secret: process.env.NEXTAUTH_SECRET!,
   });
 
   // Check if user is authenticated
@@ -208,7 +208,7 @@ function isSystemAdminRoute(pathname: string): boolean {
  */
 function extractWorkspaceId(pathname: string): string | null {
   const match = pathname.match(/\/workspaces\/([a-f0-9-]+)/);
-  return match ? match[1] : null;
+  return match && match[1] ? match[1] : null;
 }
 
 /**

@@ -8,7 +8,6 @@ import {
   Send,
   Copy,
   Play,
-  Save,
   Sparkles,
   Bot,
   User,
@@ -18,16 +17,13 @@ import {
   CheckCircle,
   Loader2,
   RefreshCw,
-  Settings,
   Plus,
   MessageSquare,
   Trash2,
-  Edit,
   Clock,
   ChevronLeft,
-  ChevronRight,
 } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Header } from "@/components/layout/header";
 import { Sidebar } from "@/components/layout/sidebar";
@@ -40,16 +36,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import CodeMirror from '@uiw/react-codemirror';
 import { sql } from '@codemirror/lang-sql';
 import { oneDark } from '@codemirror/theme-one-dark';
-import { useTheme } from "next-themes";
 import { cn } from "@/lib/utils";
-import { messageVariants, sidebarVariants, slideInFromLeft } from "@/lib/animations";
 import { TableSelector } from "@/components/ui/table-selector";
 
 // Utility function for relative time
@@ -106,7 +98,6 @@ interface Conversation {
 export default function AIAssistantPage() {
   const router = useRouter();
   const { data: session } = useSession();
-  const { theme } = useTheme();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -117,7 +108,7 @@ export default function AIAssistantPage() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [selectedConnection, setSelectedConnection] = useState("");
   const [selectedModel, setSelectedModel] = useState("");
-  const [includeSchema, setIncludeSchema] = useState(true);
+  const includeSchema = true;
   const [availableModels, setAvailableModels] = useState<Record<string, boolean>>({});
   const [isCheckingKeys, setIsCheckingKeys] = useState(true);
 
@@ -139,7 +130,7 @@ export default function AIAssistantPage() {
 
   // Get workspace ID from session - using the first workspace from memberships
   // Use the Acme Corp workspace ID which has the connections
-  const workspaceId = session?.workspaces?.[0]?.id || session?.user?.memberships?.[0]?.workspaceId || "ddd3f516-4520-4987-b14e-768b9092d2f8";
+  const workspaceId = session?.workspaces?.[0]?.id || "ddd3f516-4520-4987-b14e-768b9092d2f8";
 
   // Check for available API keys on mount
   useEffect(() => {
@@ -161,7 +152,7 @@ export default function AIAssistantPage() {
             .filter(([_, available]) => available)
             .map(([key]) => key);
           
-          if (availableModelKeys.length > 0) {
+          if (availableModelKeys.length > 0 && availableModelKeys[0]) {
             setSelectedModel(availableModelKeys[0]);
           }
         }
@@ -311,7 +302,7 @@ export default function AIAssistantPage() {
     if (!connectionExists) {
       console.error("Selected connection not found in available connections");
       // Reset to first available connection
-      if (connections.length > 0) {
+      if (connections.length > 0 && connections[0]) {
         setSelectedConnection(connections[0].id);
         return;
       }

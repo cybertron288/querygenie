@@ -104,12 +104,12 @@ export async function POST(
         conversationId: params.conversationId,
         role: validated.role,
         content: validated.content,
-        sqlQuery: validated.sqlQuery,
-        explanation: validated.explanation,
-        confidence: validated.confidence,
-        executionTime: validated.executionTime,
-        rowsAffected: validated.rowsAffected,
-        error: validated.error,
+        sqlQuery: validated.sqlQuery || null,
+        explanation: validated.explanation || null,
+        confidence: validated.confidence || null,
+        executionTime: validated.executionTime || null,
+        rowsAffected: validated.rowsAffected || null,
+        error: validated.error || null,
         metadata: validated.metadata || {},
       })
       .returning({
@@ -130,7 +130,7 @@ export async function POST(
     await db
       .update(conversations)
       .set({
-        messageCount: conversation.messageCount + 1,
+        messageCount: (conversation.messageCount || 0) + 1,
         lastActivityAt: new Date(),
         updatedAt: new Date(),
         // Make this conversation active if user is adding a message

@@ -124,10 +124,15 @@ export async function verifyPassword(
   password: string,
   hashedPassword: string
 ): Promise<boolean> {
-  const [salt, hash] = hashedPassword.split(":");
+  const parts = hashedPassword.split(":");
+  if (parts.length !== 2) {
+    return false;
+  }
+  
+  const [salt, hash] = parts;
   const verifyHash = crypto.pbkdf2Sync(
     password,
-    Buffer.from(salt, "hex"),
+    Buffer.from(salt!, "hex"),
     iterations,
     64,
     "sha512"

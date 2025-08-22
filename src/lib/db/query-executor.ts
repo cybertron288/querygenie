@@ -139,7 +139,7 @@ async function executePostgresQuery(options: any): Promise<QueryResult> {
     if (result.command === "SELECT" || result.rows) {
       return {
         success: true,
-        columns: result.fields?.map((f) => f.name) || [],
+        columns: result.fields?.map((f: any) => f.name) || [],
         rows: result.rows,
         rowCount: result.rowCount || 0,
       };
@@ -188,22 +188,25 @@ async function executeMysqlQuery(options: any): Promise<QueryResult> {
   let connection;
   
   try {
-    connection = await mysql.createConnection({
+    const connectionConfig: any = {
       host: options.host,
       port: options.port || 3306,
       database: options.database,
       user: options.username,
       password: options.password,
-      ssl: options.sslConfig?.enabled
-        ? {
-            rejectUnauthorized: options.sslConfig.rejectUnauthorized ?? true,
-            ca: options.sslConfig.ca,
-            cert: options.sslConfig.cert,
-            key: options.sslConfig.key,
-          }
-        : undefined,
       connectTimeout: 10000,
-    });
+    };
+    
+    if (options.sslConfig?.enabled) {
+      connectionConfig.ssl = {
+        rejectUnauthorized: options.sslConfig.rejectUnauthorized ?? true,
+        ca: options.sslConfig.ca,
+        cert: options.sslConfig.cert,
+        key: options.sslConfig.key,
+      };
+    }
+    
+    connection = await mysql.createConnection(connectionConfig);
 
     // Set query timeout
     if (options.timeout) {
@@ -281,7 +284,7 @@ async function executeSqliteQuery(options: any): Promise<QueryResult> {
       const rows = stmt.all();
       
       // Get column names
-      const columns = rows.length > 0 ? Object.keys(rows[0]) : [];
+      const columns = rows.length > 0 ? Object.keys(rows[0] as any) : [];
       
       db.close();
       
