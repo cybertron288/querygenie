@@ -1,23 +1,21 @@
 /**
  * Database Connections API
  * 
- * Manages database connections for workspaces
+ * Manages database connections for users (simplified version without workspaces)
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth/config";
 import { db } from "@/lib/db";
-import { connections, memberships } from "@/lib/db/schema";
+import { connections } from "@/lib/db/schema";
 import { eq, and, isNull } from "drizzle-orm";
 import { z } from "zod";
-import {
-  createConnection,
-} from "@/lib/db/connection-service";
+import { nanoid } from "nanoid";
+import { encrypt } from "@/lib/encryption";
 
 // Validation schemas
 const createConnectionSchema = z.object({
-  workspaceId: z.string().uuid(),
   name: z.string().min(1).max(255),
   type: z.enum(["postgres", "mysql", "mssql", "sqlite"]),
   host: z.string().optional(),
@@ -32,7 +30,7 @@ const createConnectionSchema = z.object({
 
 /**
  * GET /api/connections
- * Get connections for a workspace
+ * Get connections for the current user
  */
 export async function GET(request: NextRequest) {
   try {
@@ -45,38 +43,8 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const { searchParams } = new URL(request.url);
-    const workspaceId = searchParams.get("workspaceId");
-    
-    if (!workspaceId) {
-      return NextResponse.json(
-        { error: "Bad Request", message: "workspaceId is required" },
-        { status: 400 }
-      );
-    }
-
-    // Check if user has access to workspace
-    const [membership] = await db
-      .select()
-      .from(memberships)
-      .where(
-        and(
-          eq(memberships.userId, session.user.id),
-          eq(memberships.workspaceId, workspaceId),
-          eq(memberships.isActive, true)
-        )
-      )
-      .limit(1);
-
-    if (!membership) {
-      return NextResponse.json(
-        { error: "Forbidden", message: "Access denied to this workspace" },
-        { status: 403 }
-      );
-    }
-
-    // Get connections (without sensitive data)
-    const workspaceConnections = await db
+    // Get connections created by the user (without sensitive data)
+    const userConnections = await db
       .select({
         id: connections.id,
         name: connections.name,
@@ -94,16 +62,16 @@ export async function GET(request: NextRequest) {
       .from(connections)
       .where(
         and(
-          eq(connections.workspaceId, workspaceId),
+          eq(connections.createdById, session.user.id),
           isNull(connections.deletedAt)
         )
       );
 
-    console.log(`Found ${workspaceConnections.length} connections for workspace ${workspaceId}`);
+    console.log(`Found ${userConnections.length} connections for user ${session.user.id}`);
 
     return NextResponse.json({
       success: true,
-      connections: workspaceConnections,
+      connections: userConnections,
     });
   } catch (error) {
     console.error("Error fetching connections:", error);
@@ -116,7 +84,7 @@ export async function GET(request: NextRequest) {
 
 /**
  * POST /api/connections
- * Create a new connection
+ * Create a new connection for the current user
  */
 export async function POST(request: NextRequest) {
   try {
@@ -132,36 +100,40 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const validatedData = createConnectionSchema.parse(body);
 
-    // Check if user has admin/owner access to workspace
-    const [membership] = await db
-      .select()
-      .from(memberships)
-      .where(
-        and(
-          eq(memberships.userId, session.user.id),
-          eq(memberships.workspaceId, validatedData.workspaceId),
-          eq(memberships.isActive, true)
-        )
-      )
-      .limit(1);
-
-    if (!membership || !["owner", "admin", "editor"].includes(membership.role)) {
-      return NextResponse.json(
-        { error: "Forbidden", message: "Insufficient permissions" },
-        { status: 403 }
-      );
+    // Encrypt sensitive data
+    const encryptedCreds: any = {};
+    if (validatedData.password) {
+      encryptedCreds.password = await encrypt(validatedData.password);
+    }
+    if (validatedData.connectionString) {
+      encryptedCreds.connectionString = await encrypt(validatedData.connectionString);
     }
 
     // Create connection with encrypted credentials
-    const connectionId = await createConnection(
-      validatedData.workspaceId,
-      session.user.id,
-      validatedData as any
-    );
+    // Using a dummy workspace ID for now since the schema requires it
+    const dummyWorkspaceId = "00000000-0000-0000-0000-000000000000";
+    
+    const [newConnection] = await db
+      .insert(connections)
+      .values({
+        id: nanoid(),
+        workspaceId: dummyWorkspaceId, // Required by schema but not used
+        name: validatedData.name,
+        type: validatedData.type as any,
+        host: validatedData.host || null,
+        port: validatedData.port || null,
+        database: validatedData.database || null,
+        username: validatedData.username || null,
+        encryptedCredentials: JSON.stringify(encryptedCreds),
+        sslConfig: validatedData.sslConfig || {},
+        createdById: session.user.id,
+        isActive: true,
+      })
+      .returning({ id: connections.id });
 
     return NextResponse.json({
       success: true,
-      connectionId,
+      connectionId: newConnection?.id,
       message: "Connection created successfully",
     });
   } catch (error: any) {

@@ -118,7 +118,7 @@ export default function ConnectionsPage() {
 
   // Get workspace ID from session - using the first workspace from memberships
   // Use the Acme Corp workspace ID which has the connections
-  const workspaceId = (session as any)?.workspaces?.[0]?.id || "ddd3f516-4520-4987-b14e-768b9092d2f8";
+  // Workspace not needed for simplified version
 
   // Load connections
   useEffect(() => {
@@ -130,9 +130,9 @@ export default function ConnectionsPage() {
   const loadConnections = async () => {
     try {
       setIsLoading(true);
-      console.log("Loading connections for workspace:", workspaceId);
+      console.log("Loading connections for user:", session?.user?.id);
       console.log("Session data:", session);
-      const response = await fetch(`/api/connections?workspaceId=${workspaceId}`);
+      const response = await fetch(`/api/connections`);
       
       if (response.ok) {
         const data = await response.json();
@@ -198,7 +198,7 @@ export default function ConnectionsPage() {
   const handleSaveConnection = async () => {
     try {
       const payload = {
-        workspaceId,
+        // workspaceId removed,
         name: connectionForm.name,
         type: connectionForm.type,
         ...(connectionForm.useConnectionString
