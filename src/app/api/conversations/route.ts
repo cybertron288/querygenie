@@ -52,7 +52,7 @@ export async function GET(request: NextRequest) {
 
     // Build query conditions
     const conditions = [
-      eq(conversations.userId, session.user.id),
+      eq(conversations.createdById, session.user.id),
       isNull(conversations.deletedAt),
     ];
 
@@ -65,9 +65,9 @@ export async function GET(request: NextRequest) {
       .select({
         id: conversations.id,
         title: conversations.title,
-        model: conversations.model,
+        description: conversations.description,
         messageCount: conversations.messageCount,
-        lastMessageAt: conversations.lastMessageAt,
+        lastActivityAt: conversations.lastActivityAt,
         connectionId: conversations.connectionId,
         createdAt: conversations.createdAt,
         updatedAt: conversations.updatedAt,
@@ -81,7 +81,7 @@ export async function GET(request: NextRequest) {
       .from(conversations)
       .leftJoin(connections, eq(conversations.connectionId, connections.id))
       .where(and(...conditions))
-      .orderBy(desc(conversations.lastMessageAt))
+      .orderBy(desc(conversations.lastActivityAt))
       .limit(validated.limit)
       .offset(validated.offset);
 
@@ -127,7 +127,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { connectionId, model = "gemini", title } = body;
+    const { connectionId, title } = body;
 
     if (!connectionId) {
       return NextResponse.json(
@@ -163,14 +163,13 @@ export async function POST(request: NextRequest) {
     const [newConversation] = await db
       .insert(conversations)
       .values({
-        id: nanoid(),
         workspaceId: dummyWorkspaceId, // Required by schema but not used
-        userId: session.user.id,
+        createdById: session.user.id,
         connectionId,
         title: title || "New Conversation",
-        model,
+        description: null,
         messageCount: 0,
-        lastMessageAt: new Date(),
+        lastActivityAt: new Date(),
       })
       .returning();
 
