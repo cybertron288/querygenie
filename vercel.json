@@ -1,0 +1,20 @@
+{
+  "buildCommand": "pnpm install && pnpm run build",
+  "outputDirectory": ".next",
+  "installCommand": "pnpm install --frozen-lockfile",
+  "framework": "nextjs",
+  "env": {
+    "NODE_OPTIONS": "--max-old-space-size=4096"
+  },
+  "functions": {
+    "app/api/ai/execute-tool/route.ts": {
+      "maxDuration": 30
+    },
+    "app/api/ai/generate/route.ts": {
+      "maxDuration": 30
+    },
+    "app/api/queries/[queryId]/execute/route.ts": {
+      "maxDuration": 30
+    }
+  }
+}
