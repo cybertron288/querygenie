@@ -11,7 +11,7 @@ export default defineConfig({
   // Database connection
   dialect: "postgresql", 
   dbCredentials: {
-    url: "postgresql://postgres:postgres@localhost:5432/querygenie",
+    url: process.env.DATABASE_URL || "postgresql://postgres:postgres@localhost:5432/querygenie",
   },
 
   // Schema files
