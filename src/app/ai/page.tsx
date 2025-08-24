@@ -128,9 +128,7 @@ export default function AIAssistantPage() {
   const [explorationTables, setExplorationTables] = useState<any[]>([]);
   const [userQuery, setUserQuery] = useState("");
 
-  // Get workspace ID from session - using the first workspace from memberships
-  // Use the Acme Corp workspace ID which has the connections
-  const workspaceId = session?.workspaces?.[0]?.id || "ddd3f516-4520-4987-b14e-768b9092d2f8";
+  // Workspace ID not needed for simplified version
 
   // Check for available API keys on mount
   useEffect(() => {
@@ -141,10 +139,10 @@ export default function AIAssistantPage() {
           const data = await response.json();
           setAvailableModels(data.availableModels);
           
-          // If no keys available, redirect to API keys page
+          // If no keys available, show a message but don't redirect
+          // Let user add keys from the UI
           if (!data.hasAnyKey) {
-            router.push("/api-keys?setup=true");
-            return;
+            console.log("No API keys configured yet");
           }
           
           // Set default model to first available one
@@ -172,7 +170,7 @@ export default function AIAssistantPage() {
       if (!session) return;
       
       try {
-        const response = await fetch(`/api/connections?workspaceId=${workspaceId}`);
+        const response = await fetch(`/api/connections`);
         
         if (response.ok) {
           const data = await response.json();
@@ -201,17 +199,17 @@ export default function AIAssistantPage() {
     };
 
     loadConnections();
-  }, [session, workspaceId]);
+  }, [session]);
 
   // Load conversations for selected connection
   useEffect(() => {
     const loadConversations = async () => {
-      if (!session || !selectedConnection || !workspaceId) return;
+      if (!session || !selectedConnection) return;
       
       setIsLoadingConversations(true);
       try {
         const response = await fetch(
-          `/api/conversations?workspaceId=${workspaceId}&connectionId=${selectedConnection}`
+          `/api/conversations?connectionId=${selectedConnection}`
         );
         
         if (response.ok) {
@@ -244,7 +242,7 @@ export default function AIAssistantPage() {
     };
 
     loadConversations();
-  }, [session, selectedConnection, workspaceId]);
+  }, [session, selectedConnection]);
 
   // Load messages when current conversation changes
   useEffect(() => {
