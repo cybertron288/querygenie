@@ -288,8 +288,12 @@ export const authOptions: NextAuthOptions = {
         return `${baseUrl}${url}`;
       }
       // Allows callback URLs on the same origin
-      else if (new URL(url).origin === baseUrl) {
-        return url;
+      try {
+        if (new URL(url).origin === baseUrl) {
+          return url;
+        }
+      } catch (e) {
+        // Invalid URL, return baseUrl
       }
       return baseUrl;
     },

@@ -21,7 +21,7 @@ const sql = postgres(env.DATABASE_URL, {
   max: 10,
   idle_timeout: 20,
   connect_timeout: 10,
-  ssl: false,
+  ssl: env.DATABASE_URL.includes('neon.tech') ? 'require' : false,
 });
 
 /**
