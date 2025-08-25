@@ -55,7 +55,7 @@ import { cn } from "@/lib/utils";
 interface Connection {
   id: string;
   name: string;
-  type: "postgres" | "mysql" | "sqlite";
+  type: "postgres" | "mysql" | "mssql" | "sqlite";
   host?: string;
   port?: number;
   database?: string;
@@ -80,6 +80,13 @@ const connectionTypes = {
     color: "text-orange-500",
     defaultPort: 3306,
     description: "Popular open source database",
+  },
+  mssql: {
+    name: "SQL Server",
+    icon: Database,
+    color: "text-purple-500",
+    defaultPort: 1433,
+    description: "Microsoft SQL Server",
   },
   sqlite: {
     name: "SQLite",
@@ -366,7 +373,7 @@ export default function ConnectionsPage() {
             ) : (
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {connections.map((connection) => {
-                  const typeInfo = connectionTypes[connection.type];
+                  const typeInfo = connectionTypes[connection.type] || connectionTypes.postgres;
                   const Icon = typeInfo.icon;
                   
                   return (
