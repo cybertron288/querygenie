@@ -17,7 +17,7 @@ import {
 import { eq, and, desc, sql } from "drizzle-orm";
 import { checkPermission } from "@/lib/auth/permissions";
 import { auditLog } from "@/lib/audit";
-import { nanoid } from "nanoid";
+import { v4 as uuidv4 } from "uuid";
 import { encrypt } from "@/lib/encryption";
 import { testDatabaseConnection } from "@/lib/db/test-connection";
 
@@ -199,7 +199,7 @@ export async function POST(
       : null;
 
     // Create connection
-    const connectionId = nanoid();
+    const connectionId = uuidv4();
     
     const [newConnection] = await db
       .insert(connections)

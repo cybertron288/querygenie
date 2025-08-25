@@ -11,7 +11,7 @@ import { db } from "@/lib/db";
 import { workspaces, memberships } from "@/lib/db/schema";
 import { createWorkspaceSchema, paginationSchema } from "@/lib/api/validation";
 import { eq, desc, and, sql } from "drizzle-orm";
-import { nanoid } from "nanoid";
+import { v4 as uuidv4 } from "uuid";
 import { auditLog } from "@/lib/audit";
 
 /**
@@ -142,8 +142,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Create workspace with transaction
-    const workspaceId = nanoid();
-    const membershipId = nanoid();
+    const workspaceId = uuidv4();
+    const membershipId = uuidv4();
 
     await db.transaction(async (tx) => {
       // Create workspace

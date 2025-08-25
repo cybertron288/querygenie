@@ -17,7 +17,8 @@ import {
 import { eq, and, desc } from "drizzle-orm";
 import { checkPermission } from "@/lib/auth/permissions";
 import { auditLog } from "@/lib/audit";
-import { nanoid } from "nanoid";
+import { v4 as uuidv4 } from "uuid";
+import { randomBytes } from "crypto";
 import { sendEmail } from "@/lib/email";
 
 /**
@@ -232,8 +233,8 @@ export async function POST(
     }
 
     // Create invitation
-    const invitationId = nanoid();
-    const invitationToken = nanoid(32);
+    const invitationId = uuidv4();
+    const invitationToken = randomBytes(32).toString('hex');
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 7); // 7 days expiry
 

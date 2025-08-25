@@ -18,7 +18,7 @@ import {
 import { eq, and, desc, sql } from "drizzle-orm";
 import { checkPermission } from "@/lib/auth/permissions";
 import { auditLog, createAuditContext } from "@/lib/audit";
-import { nanoid } from "nanoid";
+import { v4 as uuidv4 } from "uuid";
 import { executeQuery } from "@/lib/db/query-executor";
 import { generateSQLQuery } from "@/lib/ai/query-generator";
 
@@ -275,8 +275,8 @@ export async function POST(
       }
 
       // Create query record
-      const queryId = nanoid();
-      const executionId = nanoid();
+      const queryId = uuidv4();
+      const executionId = uuidv4();
 
       // Execute the query
       const startTime = new Date();

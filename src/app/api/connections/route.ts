@@ -11,7 +11,7 @@ import { db } from "@/lib/db";
 import { connections } from "@/lib/db/schema";
 import { eq, and, isNull } from "drizzle-orm";
 import { z } from "zod";
-import { nanoid } from "nanoid";
+import { v4 as uuidv4 } from "uuid";
 import { encrypt } from "@/lib/encryption";
 
 // Validation schemas
@@ -116,7 +116,7 @@ export async function POST(request: NextRequest) {
     const [newConnection] = await db
       .insert(connections)
       .values({
-        id: nanoid(),
+        id: uuidv4(),
         workspaceId: dummyWorkspaceId, // Required by schema but not used
         name: validatedData.name,
         type: validatedData.type as any,
